@@ -182,6 +182,7 @@ int main(int argc, char **argv)
 	int i;
 	int64_t window_size;
 	int64_t skip_until_beat = 0;
+	int64_t last_beat = 0;
 	heartbeat_record_t current;
 	actuator_t controls[ACTUATOR_COUNT] = {
 		{ .id = ACTUATOR_CORE, .init_f = core_init, .action_f = core_act },
@@ -219,6 +220,10 @@ int main(int argc, char **argv)
 	while (1) {	/* what, me worry? */
 		do {
 			err = hrm_get_current(&hrm, &current);
+			if (!err && current.beat > last_beat) {
+				last_beat = current.beat;
+				print_status(&current, skip_until_beat, '.', ACTUATOR_COUNT, controls);
+			}
 		} while (err || current.beat < skip_until_beat);
 		
 		/*printf("Current beat: %lld, tag: %d, window: %lld, window_rate: %f\n",
