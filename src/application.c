@@ -40,7 +40,7 @@ int main(int argc, char** argv) {
    int rc;
 
    printf("Init\n");
-   rc = heartbeat_init(&heart, 0, 1000000, 100, BD, NULL);
+   rc = heartbeat_init(&heart, 100, 200, 100, BD, NULL);
 
    if(rc != 0)
      printf("Error allocating heartbeat data %d\n", rc);

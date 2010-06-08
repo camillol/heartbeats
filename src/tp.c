@@ -35,9 +35,9 @@ int main(int argc, char** argv) {
    int i;
    const int MAX = atoi(argv[1]);
 
-      heartbeat_init(&heart, 0, 1000000, 100, 1000, NULL);
+      heartbeat_init(&heart, 0, 100, 100, 1000, NULL);
 
-   usleep(1000);
+   usleep(3000000);
 
    for(i = 0; i < MAX; i++) {
      heartbeat(&heart, i);
