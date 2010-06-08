@@ -82,7 +82,7 @@ int core_act (actuator_t *act, pid_t pid)
 {
 	char command[256];
 	
-	snprintf(command, sizeof(command), "taskset -pc 0-%d %d >& /dev/null", (int)(act->value - 1), (int)pid);
+	snprintf(command, sizeof(command), "taskset -pc 0-%d %d > /dev/null", (int)(act->value - 1), (int)pid);
 	return system(command);
 }
 
@@ -166,9 +166,11 @@ void dummy_control (heartbeat_record_t *hb, int act_count, actuator_t *acts)
 
 /* BACK TO ZA CHOPPA */
 
-void print_status(heartbeat_record_t *current, int64_t skip_until_beat, char action, int act_acount, controls)
+void print_status(heartbeat_record_t *current, int64_t skip_until_beat, char action, int act_acount, actuator_t *controls)
 {
-	printf("%lld\t%.3f\t%d\t%c", current->beat, current->window_rate, skip_until_beat, action);
+	int i;
+
+	printf("%lld\t%.3f\t%lld\t%c", (long long int)current->beat, current->window_rate, (long long int)skip_until_beat, action);
 	for (i = 0; i < act_acount; i++)
 		printf("\t%lld", controls[i].value);
 	printf("\n");
@@ -220,11 +222,13 @@ int main(int argc, char **argv)
 	while (1) {	/* what, me worry? */
 		do {
 			err = hrm_get_current(&hrm, &current);
-			if (!err && current.beat > last_beat) {
-				last_beat = current.beat;
-				print_status(&current, skip_until_beat, '.', ACTUATOR_COUNT, controls);
-			}
-		} while (err || current.beat < skip_until_beat);
+		} while (err || current.beat <= last_beat);
+
+		last_beat = current.beat;
+		if (current.beat < skip_until_beat) {
+			print_status(&current, skip_until_beat, '.', ACTUATOR_COUNT, controls);
+			continue;
+		}
 		
 		/*printf("Current beat: %lld, tag: %d, window: %lld, window_rate: %f\n",
 			   current.beat, current.tag, window_size, current.window_rate);*/
