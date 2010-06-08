@@ -192,22 +192,22 @@ if (speed > 1000000) {
 		tmp = speed % 10000;
 		if (tmp >= 5000)
 			speed += 10000;
-		printf ("%u.%02u GHz", ((unsigned int) speed/1000000),
-			((unsigned int) (speed%1000000)/10000));
+		/*printf ("%u.%02u GHz", ((unsigned int) speed/1000000),
+			((unsigned int) (speed%1000000)/10000));*/
 	} else
            if (speed > 100000) {
 		tmp = speed % 1000;
 		if (tmp >= 500)
 			speed += 1000;
-		printf ("%u MHz", ((unsigned int) speed / 1000));
+		/*printf ("%u MHz", ((unsigned int) speed / 1000));*/
 	} else if (speed > 1000) {
 		tmp = speed % 100;
 		if (tmp >= 50)
 			speed += 100;
-		printf ("%u.%01u MHz", ((unsigned int) speed/1000),
-			((unsigned int) (speed%1000)/100));
+		/*printf ("%u.%01u MHz", ((unsigned int) speed/1000),
+			((unsigned int) (speed%1000)/100));*/
 	} else
-		printf ("%lu kHz", speed);
+		/*printf ("%lu kHz", speed);*/
 
 	return  (unsigned int)speed/1000;
 }
@@ -252,6 +252,11 @@ unsigned long curent_init_freq;
 }
 /**/
 
+void print_status(heartbeat_record_t *current, int wait_for, unsigned long freq, char action)
+{
+	printf("%lld\t%.3f\t%u\t%c\t%d\n", current->beat, current->window_rate, freq, action, wait_for);
+}
+
 /**
        * 
        */
@@ -264,7 +269,7 @@ int main(int argc, char** argv) {
   int apps[1024];
 
 /**/
-extern char *optarg;
+        extern char *optarg;
 	extern int optind, opterr, optopt;
 	int ret = 0, cont = 1;
 	unsigned int cpu = 0;
@@ -276,6 +281,8 @@ extern char *optarg;
         struct cpufreq_available_frequencies *freqs;
         int retr =0;
 
+	setlinebuf(stdout);
+
     ncpus=get_cpus();
   ret= get_hardware_limits(cpu);
 
@@ -284,23 +291,13 @@ extern char *optarg;
 
   ret= get_policy(ncpus);
 
-  freqs = cpufreq_get_available_frequencies(cpu);
+  freqs = cpufreq_get_available_frequencies(0);
 
 /*if (freqs==null){
   goto out;
 }*/
 
   current = get_available_freqs_size(freqs);
-/*("available frequency steps: ");
-		while (freqs->next) {
-			 print_speed(freqs->frequency);
-			printf(", ");
-			freqs = freqs->next;
-		}
-		print_speed(freqs->frequency);
-		printf("\n");
-		//cpufreq_put_available_frequencies(freqs);*/
-
 
   unsigned long* available_freqs = (unsigned long *) malloc(current*sizeof(unsigned long));
 
@@ -315,9 +312,6 @@ extern char *optarg;
 
 
   current_freq = cpufreq_get_freq_kernel(cpu);
-  printf("Current frequency is: %luMHZ\n", get_speed(current_freq)); 
-  printf("Locate current frequency: %lu\n", get_speed(available_freqs[current_counter]));
-  printf("%d",ret);
 
 
    if(getenv("HEARTBEAT_ENABLED_DIR") == NULL) {
@@ -341,7 +335,7 @@ extern char *optarg;
      exit(2);
   }
 
-  sleep(5);
+/*  sleep(5);*/
 
 #if 1
   int rc = heart_rate_monitor_init(&heart, apps[0]);
@@ -355,17 +349,19 @@ extern char *optarg;
       printf(" rate interval is %f - %f\n", hrm_get_min_rate(&heart), hrm_get_max_rate(&heart));
 
 
+printf("beat\trate\tfreq\tact\twait\n");
+
   int64_t window_size =  hrm_get_window_size(&heart);
   int wait_for = (int) window_size;
   int current_beat = 0;
   int current_beat_prev= 0;
   int nprocs = 1;
   unsigned int set_freq = min;
-  printf("Current beat is %d, wait_for = %d\n", current_beat, wait_for);
+ 
 
   // return 1;  
     
-  while(current_beat < MAX-1) {
+  while(current_beat < MAX) {
     int rc = -1;
     heartbeat_record_t record;
     char command[256];
@@ -379,71 +375,82 @@ extern char *optarg;
        
       if(current_beat_prev == current_beat)
       continue;
-      printf(" rc: %d, current_beat:%d \n", rc,current_beat);
+    /*  printf(" rc: %d, current_beat:%d \n", rc,current_beat);*/
     /*Situation where doesn't happen nothing*/   
       if( current_beat < wait_for){
           current_beat_prev= current_beat;
-          printf("I am in situation wait_for\n");
-          current_freq = cpufreq_get_freq_kernel(cpu);
-          printf("Current frequency is: %u\n", get_speed(current_freq));
+         /* printf("I am in situation wait_for\n");*/
+                current_freq = cpufreq_get_freq_kernel(0);
+		print_status(&record, wait_for, current_freq, '.');
         continue;
       }
 
 
-      printf("Current beat is %d, wait_for = %d, %f\n", current_beat, wait_for, record.window_rate);
+    /*  printf("Current beat is %d, wait_for = %d, %f\n", current_beat, wait_for, record.window_rate);*/
 
        /*Situation where frequency is up-scaled*/
       if(record.window_rate < hrm_get_min_rate(&heart)) {  
-          printf("I am in situation up :)"); 
-         
-          current_freq = cpufreq_get_freq_kernel(cpu);
-          printf("Current frequency is: %lu", current_freq);
+ 
+
+  	wait_for = current_beat + window_size;      
         
 
          if (current_counter > 0){
+
           int cpu;
               current_counter--;  
              set_freq = get_speed(available_freqs[current_counter]);
+
              for (cpu=0; cpu < ncpus; cpu++) {
-	     sprintf(command, "cpufreq-set -c %d -f %luMHZ", cpu,set_freq);
-	     printf("Executing %s\n", command);
-             system(command);
+	    /*   sprintf(command, "cpufreq-set -c %d -f %luMHZ", cpu,set_freq);*/
+	       /* printf("Executing %s\n", command);*/
+             /*  system(command);*/
+		cpufreq_set_frequency(cpu, available_freqs[current_counter]);
+
              }
+
              current_freq = cpufreq_get_freq_kernel(0);
-             printf("Current frequency is: %u\n", get_speed(current_freq));
-	     wait_for = current_beat + window_size;	}
-       else printf("Maximum frequency has been reached: %luMHZ\n", get_speed(current_freq));
+		print_status(&record, wait_for, current_freq, '+');
+            }
+
+       else {
+          current_freq = cpufreq_get_freq_kernel(0);
+		print_status(&record, wait_for, current_freq, 'M');
+
+         }
       }
 
      /*Situation where frequency is downscaled*/
 
       else if(record.window_rate > hrm_get_max_rate(&heart)) {
-        printf("I am in situation down:)");
-	
+	wait_for = current_beat + window_size;       
        if (current_counter < current){
           current_counter++;
           set_freq = get_speed(available_freqs[current_counter]);
           for (cpu=0; cpu < ncpus; cpu++) {
-          sprintf(command, " sudo cpufreq-set -c %d -f %uMHZ", cpu,set_freq);
-	  printf("Executing %s\n", command);
-	  system(command);
-        /* freqs= freqs->next;*/
-         current_freq = cpufreq_get_freq_kernel(0);
-         printf("Current frequency is: %u\n", get_speed(current_freq));
-	 wait_for = current_beat + window_size;
+         /* sprintf(command, " cpufreq-set -c %d -f %uMHZ", cpu,set_freq);*/
+	 /* printf("Executing %s\n", command);*/
+	  /*system(command);*/
+		cpufreq_set_frequency(cpu, available_freqs[current_counter]);
           }
-	}
+        
+         current_freq = cpufreq_get_freq_kernel(0);
+		print_status(&record, wait_for, current_freq, '-');
+          }
+	
 
         else {
-          current_freq = cpufreq_get_freq_kernel(cpu);
-          printf("Minimum frequency has been reached: %uMHZ\n", get_speed(current_freq));
+          current_freq = cpufreq_get_freq_kernel(0);
+		print_status(&record, wait_for, current_freq, 'm');
+
         }
 		
-	wait_for = current_beat + window_size;
+
       }
 
       else {
 	wait_for = current_beat+1;
+	print_status(&record, wait_for, current_freq, '=');
       }
       current_beat_prev= current_beat;
       records[i].tag = current_beat;
@@ -455,9 +462,9 @@ extern char *optarg;
 
   //printf("System: Global heart rate: %f, Current heart rate: %f\n", heart.global_heartrate, heart.window_heartrate);
 
-  for(i = 0; i < MAX; i++) {
+/*  for(i = 0; i < MAX; i++) {
     printf("%d, %f\n", records[i].tag, records[i].rate);
-  }
+  }*/
   heart_rate_monitor_finish(&heart);
 #endif
 

@@ -76,13 +76,10 @@ int get_heartbeat_apps(int* apps) {
     close(commpipe[1]);		
     while(fgets(string[count], 100, stdin)) {
       apps[count] = atoi(string[count]);
-      printf("app %d\n", apps[count]);
 
      count++;
     }
     
-    printf("From the system: found %d apps\n", count);
-    printf("From the system: app is %d\n", apps[0]);
     wait(&rv);				/* Wait for child process to end */
     //fprintf(stderr,"Child exited with a %d value\n",rv);
   }
@@ -129,6 +126,9 @@ static int get_policy(unsigned int cpu) {
                 struct cpufreq_policy *policy = cpufreq_get_policy(cpu);
                  printf("%lu %lu %s\n", policy->min, policy->max, policy->governor);
                 } 
+      
+	if (!policy)
+		return -EINVAL;
 
 	    cpufreq_put_policy(policy);
 	return 0;
@@ -191,6 +191,7 @@ static int store_available_freqs(struct cpufreq_available_frequencies *frequenci
 
    while(frequencies && i <= count){
             freq_array[i] = frequencies->frequency;
+           get_speed(freq_array[i]);
             i++;
             frequencies= frequencies->next;
           }
@@ -276,6 +277,10 @@ extern char *optarg;
 
   current_freq = cpufreq_get_freq_kernel(cpu);
   printf("Current frequency is: %luMHZ\n", get_speed(current_freq)); 
+  current_freq = cpufreq_get_freq_kernel(1);
+  printf("Current frequency is: %luMHZ\n", get_speed(current_freq)); 
+current_freq = cpufreq_get_freq_kernel(2);
+  printf("Current frequency is: %luMHZ\n", get_speed(current_freq)); 
   printf("Locate current frequency: %lu\n", get_speed(available_freqs[current_counter]));
   printf("%d",ret);
 
@@ -308,7 +313,7 @@ extern char *optarg;
   printf("buffer depth is %lld\n", (long long int) heart.state->buffer_depth);
 
   i = 0;
-      printf(" rate interval is %f - %f\n", hrm_get_min_rate(&heart), hrm_get_max_rate(&heart));
+   printf("rate interval is %f - %f\n", hrm_get_min_rate(&heart), hrm_get_max_rate(&heart));
 
 
   int64_t window_size =  hrm_get_window_size(&heart);
@@ -331,15 +336,16 @@ extern char *optarg;
 	rc = hrm_get_current(&heart, &record);
 	current_beat = record.beat;
       }
-        
+        printf(" rc: %d, current_beat:%d \n", rc,current_beat);
        
-      if(current_beat_prev == current_beat)
-      continue;
-      printf(" rc: %d, current_beat:%d \n", rc,current_beat);
+    /*  if(current_beat_prev == current_beat)
+      continue;*/
+
     /*Situation where doesn't happen nothing*/   
       if( current_beat < wait_for){
           current_beat_prev= current_beat;
           printf("I am in situation nothing :)");
+          printf(" current_rate:%f \n", record.window_rate);
           current_freq = cpufreq_get_freq_kernel(cpu);
           printf("Current frequency is: %u\n", get_speed(current_freq));
         continue;
@@ -351,14 +357,16 @@ extern char *optarg;
        /*Situation where frequency is up-scaled*/
       if(record.window_rate < hrm_get_min_rate(&heart)) {  
           printf("I am in situation up :)"); 
-          current_counter--;  
+           
           current_freq = cpufreq_get_freq_kernel(cpu);
           printf("Current frequency is: %lu", current_freq);
         
 
-         if (current_counter >=0){
+         if (current_counter >0){
+             current_counter--; 
 
              set_freq = get_speed(available_freqs[current_counter]);
+           /*  cpufreq_set_frequency(cpu, set_freq);*/
 	     sprintf(command, "cpufreq-set -f %luMHZ", set_freq);
 	     printf("Executing %s\n", command);
              system(command);
@@ -372,9 +380,11 @@ extern char *optarg;
 
       else if(record.window_rate > hrm_get_max_rate(&heart)) {
         printf("I am in situation down:)");
-	current_counter++;
+	
        if (current_counter < current){
+           current_counter++;
           set_freq = get_speed(available_freqs[current_counter]);
+        /*  cpufreq_set_frequency(cpu, set_freq);*/
           sprintf(command, " sudo cpufreq-set -f %uMHZ", set_freq);
 	  printf("Executing %s\n", command);
 	  system(command);

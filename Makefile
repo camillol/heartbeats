@@ -3,7 +3,7 @@ CXXFLAGS = -Wall -Wno-unknown-pragmas -Iinc -Llib -O6
 DBG = -g
 DEFINES ?= 
 #LDFLAGS = -lpthread -lrt -lhb-file -lhrm-file
-LDFLAGS = -lpthread -lrt -lhb-shared -lhrm-shared
+LDFLAGS = -lpthread -lrt -lhb-shared -lhrm-shared -lcpufreq
 
 DOCDIR = doc
 BINDIR = bin
@@ -12,7 +12,7 @@ INCDIR = ./inc
 SCRATCH = ./scratch
 OUTPUT = ./output
 SRCDIR = ./src
-ROOTS = application system tp lat core-allocator
+ROOTS = application system tp lat core-allocator frequencyscaler frequencyscaler1
 TEST_ROOTS = test1 test2
 BINS = $(ROOTS:%=$(BINDIR)/%)
 TESTS = $(TEST_ROOTS:%=$(BINDIR)/%)
