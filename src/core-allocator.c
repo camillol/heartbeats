@@ -140,11 +140,16 @@ void print_status(heartbeat_record_t *current, int wait_for, int cores, char act
 /**
        * 
        */
-int main(int argc, char** argv) {
+  int main(int argc, char** argv) {
   int n = 0;
   int i;
   const int MAX = atoi(argv[1]);
+  const int CORES= atoi(argv[2]);
   int ncpus=0;
+  if(CORES > ncpus){
+   printf("Wrong number of inital cores");
+   exit(2);
+}
 
   int apps[1024];
 
@@ -193,7 +198,9 @@ printf("beat\trate\tcores\tact\twait\n");
 
   printf("Current beat is %d, wait_for = %d\n", current_beat, wait_for);
 
-  // return 1;  
+  // return 1; 
+ 
+  nprocs=CORES;
     
   while(current_beat < MAX) {
     int rc = -1;

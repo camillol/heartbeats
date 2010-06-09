@@ -363,7 +363,8 @@ printf("beat\trate\tfreq\tcores\ttact\twait\n");
   int wait_for = (int) window_size;
   int current_beat = 0;
   int current_beat_prev= 0;
-  int nprocs = 1;
+  int nprocs = 1; 
+  int core_counter = 0;
   unsigned int set_freq = min;
  
 
@@ -410,9 +411,7 @@ printf("beat\trate\tfreq\tcores\ttact\twait\n");
              set_freq = get_speed(available_freqs[current_counter]);
 
              for (cpu=0; cpu < CORES; cpu++) {
-	    /*   sprintf(command, "cpufreq-set -c %d -f %luMHZ", cpu,set_freq);*/
-	       /* printf("Executing %s\n", command);*/
-             /*  system(command);*/
+	 
 		cpufreq_set_frequency(cpu, available_freqs[current_counter]);
 
              }
@@ -436,9 +435,7 @@ printf("beat\trate\tfreq\tcores\ttact\twait\n");
           current_counter++;
           set_freq = get_speed(available_freqs[current_counter]);
           for (cpu=0; cpu < CORES; cpu++) {
-         /* sprintf(command, " cpufreq-set -c %d -f %uMHZ", cpu,set_freq);*/
-	 /* printf("Executing %s\n", command);*/
-	  /*system(command);*/
+         
 		cpufreq_set_frequency(cpu, available_freqs[current_counter]);
           }
         
