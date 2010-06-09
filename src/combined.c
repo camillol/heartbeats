@@ -99,9 +99,13 @@ fail:
 int core_act (actuator_t *act)
 {
 	char command[256];
+	int err;
 	
-	snprintf(command, sizeof(command), "taskset -pc 0-%d %d > /dev/null", (int)(act->value - 1), (int)act->pid);
-	return system(command);
+	snprintf(command, sizeof(command), "taskset -pc 0-%d %d > /dev/null", (int)(act->set_value - 1), (int)act->pid);
+	err = system(command);
+	if (!err)
+		act->value = act->set_value;
+	return err;
 }
 
 /* frequency scaler stuff */
@@ -172,7 +176,11 @@ fail:
 
 int freq_act (actuator_t *act)
 {
-	return cpufreq_set_frequency(0, act->set_value);
+	int err;
+	
+	err = cpufreq_set_frequency(0, act->set_value);
+	act->value = cpufreq_get_freq_kernel(0);
+	return err;
 }
 
 /* decision functions */
@@ -259,7 +267,6 @@ int main(int argc, char **argv)
 			actuator_t *act = &controls[i];
 			if (act->set_value != act->value) {
 				err = act->action_f(act);	/* TODO: handle error */
-				act->value = act->set_value;
 				acted = 1;
 			}
 		}
