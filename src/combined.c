@@ -32,6 +32,8 @@ struct actuator {
 	int (*action_f) (actuator_t *act);
 	uint64_t value;
 	uint64_t set_value;
+	uint64_t min;
+	uint64_t max;
 	void *data;
 };
 
@@ -41,8 +43,6 @@ typedef struct freq_scaler_data {
 	unsigned long *freq_array;
 	int freq_count;
 	int cur_index;
-	unsigned long freq_min;
-	unsigned long freq_max;
 } freq_scaler_data_t;
 
 heart_rate_monitor_t hrm;
@@ -73,6 +73,26 @@ fail:
 
 /* core allocator stuff */
 
+int get_core_count ()
+{
+	static int count = 0;
+	FILE *fp = NULL;
+
+	if (!count) {
+		char buf[256];
+
+		fp = fopen("/proc/cpuinfo", "r");
+		fail_if(!fp, "cannot open /proc/cpuinfo");
+		while (fgets(buf, sizeof(buf), fp))
+			if (strstr(buf, "processor"))
+				count++;
+		fclose(fp);
+fail:
+		if (count < 1) count = 1;
+	}
+	return count;
+}
+
 int core_init (actuator_t *act)
 {
 	char buf[256];
@@ -91,6 +111,9 @@ int core_init (actuator_t *act)
 		affinity /= 2;
 	}
 	act->set_value = act->value;
+	act->min = 1;
+	act->max = get_core_count();
+
 	return 0;
 fail:
 	return -1;
@@ -147,12 +170,15 @@ int freq_init (actuator_t *act)
 	struct cpufreq_policy *policy;
 	struct cpufreq_available_frequencies *freq_list;
 	freq_scaler_data_t *data;
+	unsigned long freq_min, freq_max;
 
 	act->data = data = malloc(sizeof(freq_scaler_data_t));
 	fail_if(!data, "cannot allocate freq data block");
 
-	err = cpufreq_get_hardware_limits(0, &data->freq_min, &data->freq_max);
+	err = cpufreq_get_hardware_limits(0, &freq_min, &freq_max);
 	fail_if(err, "cannot get cpufreq hardware limits");
+	act->min = freq_min;
+	act->max = freq_max;
 	
 	policy = cpufreq_get_policy(0);
 	fail_if(!policy, "cannot get cpufreq policy");
@@ -186,6 +212,11 @@ int freq_act (actuator_t *act)
 /* decision functions */
 
 void dummy_control (heartbeat_record_t *hb, int act_count, actuator_t *acts)
+{
+	/* do nothing, lol */
+}
+
+void core_heuristics (heartbeat_record_t *hb, int act_count, actuator_t *acts)
 {
 	/* do nothing, lol */
 }
