@@ -216,19 +216,30 @@ void dummy_control (heartbeat_record_t *hb, int act_count, actuator_t *acts)
 	/* do nothing, lol */
 }
 
-void core_heuristics (heartbeat_record_t *hb, int act_count, actuator_t *acts)
+void core_heuristics (heartbeat_record_t *current, int act_count, actuator_t *acts)
 {
-	/* do nothing, lol */
+	static actuator_t *core_act = NULL;
+	int i;
+	for (i = 0; i < act_count && core_act == NULL; i++)
+		if (acts[i].id == ACTUATOR_CORE)
+			core_act = &acts[i];
+	
+	if (current->window_rate < hrm_get_min_rate(&hrm)) {
+		if (core_act->value < core_act->max) core_act->set_value++;
+	}
+	else if(current->window_rate > hrm_get_max_rate(&hrm)) {
+		if (core_act->value > core_act->min) core_act->set_value--;
+	}
 }
 
 /* BACK TO ZA CHOPPA */
 
-void print_status(heartbeat_record_t *current, int64_t skip_until_beat, char action, int act_acount, actuator_t *controls)
+void print_status(heartbeat_record_t *current, int64_t skip_until_beat, char action, int act_count, actuator_t *controls)
 {
 	int i;
 
 	printf("%lld\t%.3f\t%lld\t%c", (long long int)current->beat, current->window_rate, (long long int)skip_until_beat, action);
-	for (i = 0; i < act_acount; i++)
+	for (i = 0; i < act_count; i++)
 		printf("\t%lld", controls[i].value);
 	printf("\n");
 }
@@ -268,7 +279,7 @@ int main(int argc, char **argv)
 		err = controls[i].init_f(&controls[i]);
 		fail_if(err, "cannot initialize actuator");
 	}
-	decision_f = dummy_control;
+	decision_f = core_heuristics;
 	
 	/* begin monitoration of lone protoss */
 	err = heart_rate_monitor_init(&hrm, apps[0]);
@@ -280,7 +291,7 @@ int main(int argc, char **argv)
 	while (1) {	/* what, me worry? */
 		do {
 			err = hrm_get_current(&hrm, &current);
-		} while (err || current.beat <= last_beat);
+		} while (err || current.beat <= last_beat || current.window_rate == 0.0);
 
 		last_beat = current.beat;
 		if (current.beat < skip_until_beat) {
@@ -298,6 +309,7 @@ int main(int argc, char **argv)
 			actuator_t *act = &controls[i];
 			if (act->set_value != act->value) {
 				err = act->action_f(act);	/* TODO: handle error */
+				if (err) perror("action failed");
 				acted = 1;
 			}
 		}
