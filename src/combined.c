@@ -226,7 +226,7 @@ int main(int argc, char **argv)
 	/* initrogenizing old river control structure */
 	for (i = 0; i < ACTUATOR_COUNT; i++) {
 		controls[i].pid = apps[0];
-		err = controls[i].init_f(&controls[i], apps[0]);
+		err = controls[i].init_f(&controls[i]);
 		fail_if(err, "cannot initialize actuator");
 	}
 	decision_f = dummy_control;
@@ -258,7 +258,7 @@ int main(int argc, char **argv)
 		for (i = 0; i < ACTUATOR_COUNT; i++) {
 			actuator_t *act = &controls[i];
 			if (act->set_value != act->value) {
-				err = act->action_f(act, apps[0]);	/* TODO: handle error */
+				err = act->action_f(act);	/* TODO: handle error */
 				act->value = act->set_value;
 				acted = 1;
 			}
