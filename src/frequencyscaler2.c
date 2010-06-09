@@ -157,7 +157,7 @@ FILE *fp;
 static int set_policy(int ncpus) {
 int cpu;
 
-  for (cpu=0; cpu < ncpus; cpu++) {
+  for (cpu=0; cpu <= ncpus; cpu++) {
 	struct cpufreq_policy *policy = cpufreq_get_policy(cpu);
 	if (!policy)
 		return -EINVAL;
@@ -390,7 +390,7 @@ printf("beat\trate\tfreq\tcores\ttact\twait\n");
           current_beat_prev= current_beat;
          /* printf("I am in situation wait_for\n");*/
                 current_freq = cpufreq_get_freq_kernel(0);
-		print_status(&record, wait_for, current_freq, '.', CORES);
+		print_status(&record, wait_for, current_freq, '.',current_core);
         continue;
       }
 
@@ -404,57 +404,79 @@ printf("beat\trate\tfreq\tcores\ttact\twait\n");
   	wait_for = current_beat + window_size;      
         
          if(current_core < CORES){
-         if (current_counter > 0){
 
-             int cpu;
-             current_counter--;  
-             set_freq = get_speed(available_freqs[current_counter]);
+          current_counter = get_init_frequency(available_freqs, current_core); 
+
+           if (current_counter > 0){
+
+              
+              current_counter--;  
+              
             
-	     cpufreq_set_frequency(current_core, available_freqs[current_counter]);
+	      cpufreq_set_frequency(current_core, available_freqs[current_counter]);
+              current_freq = cpufreq_get_freq_kernel(current_core);
+	      print_status(&record, wait_for, current_freq, '+', current_core);
+             }
 
-
-             current_freq = cpufreq_get_freq_kernel(0);
-	     print_status(&record, wait_for, current_freq, '+', current_core);
-            }
-
-       else {
-            current_freq = cpufreq_get_freq_kernel(0);
+          else {
+            
             current_core++;
-          
-            print_status(&record, wait_for, current_freq, 'M', CORES);
+            current_counter = get_init_frequency(available_freqs, current_core);
+             
+            if(current_counter >0){
+            cpufreq_set_frequency(current_core, available_freqs[current_counter]);
+            }
+            current_freq = cpufreq_get_freq_kernel(current_core);
+            print_status(&record, wait_for, current_freq, 'N', current_core);
 
          }
-       }
+         }
+
      else{
-         current_freq = cpufreq_get_freq_kernel(0);
-          print_status(&record, wait_for, current_freq, 'M', CORES);
+          current_freq = cpufreq_get_freq_kernel(current_core);
+          print_status(&record, wait_for, current_freq, 'M', current_core);
        }
       }
 
      /*Situation where frequency is downscaled*/
 
       else if(record.window_rate > hrm_get_max_rate(&heart)) {
-	wait_for = current_beat + window_size;       
-       if (current_counter < current){
-          current_counter++;
-          set_freq = get_speed(available_freqs[current_counter]);
-          for (cpu=0; cpu < CORES; cpu++) {
-         
-		cpufreq_set_frequency(cpu, available_freqs[current_counter]);
-          }
-        
-         current_freq = cpufreq_get_freq_kernel(0);
-		print_status(&record, wait_for, current_freq, '-', CORES);
+	wait_for = current_beat + window_size; 
+
+        if (current_core > 0)  {
+
+           current_counter = get_init_frequency(available_freqs, current_core);   
+ 
+          if (current_counter < current){
+              current_counter++;
+
+             
+              cpufreq_set_frequency(current_core, available_freqs[current_counter]);
+              current_freq = cpufreq_get_freq_kernel(current_core);
+	      print_status(&record, wait_for, current_freq, '-', current_core);
           }
 	
 
-        else {
-          current_freq = cpufreq_get_freq_kernel(0);
-		print_status(&record, wait_for, current_freq, 'm', CORES);
+         else {
+              current_core--;
+          
+             current_counter = get_init_frequency(available_freqs, current_core);
+             
+             if(current_counter < current) {
+             cpufreq_set_frequency(current_core, available_freqs[current_counter]);
+             }
+          
+            current_freq = cpufreq_get_freq_kernel(current_core);
+            print_status(&record, wait_for, current_freq, 'n', current_core);
 
-        }
-		
+          }
+	}
+  
 
+ else{
+         current_freq = cpufreq_get_freq_kernel(current_core);
+          print_status(&record, wait_for, current_freq, 'M', current_core);
+       }
       }
 
       else {

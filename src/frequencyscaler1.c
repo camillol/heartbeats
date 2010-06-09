@@ -409,7 +409,7 @@ printf("beat\trate\tfreq\tcores\ttact\twait\n");
               current_counter--;  
              set_freq = get_speed(available_freqs[current_counter]);
 
-             for (cpu=0; cpu < CORES; cpu++) {
+             for (cpu=0; cpu <=CORES; cpu++) {
 	    /*   sprintf(command, "cpufreq-set -c %d -f %luMHZ", cpu,set_freq);*/
 	       /* printf("Executing %s\n", command);*/
              /*  system(command);*/
@@ -435,7 +435,7 @@ printf("beat\trate\tfreq\tcores\ttact\twait\n");
        if (current_counter < current){
           current_counter++;
           set_freq = get_speed(available_freqs[current_counter]);
-          for (cpu=0; cpu < CORES; cpu++) {
+          for (cpu=0; cpu <=CORES; cpu++) {
          /* sprintf(command, " cpufreq-set -c %d -f %uMHZ", cpu,set_freq);*/
 	 /* printf("Executing %s\n", command);*/
 	  /*system(command);*/

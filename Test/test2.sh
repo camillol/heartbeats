@@ -26,6 +26,9 @@ case $PROG in
 	fs|frequencyscaler)
 		PROGRAM=../bin/frequencyscaler1
 		PROGSYM=fs;;
+        fs2|frequencyscaler2)
+		PROGRAM=../bin/frequencyscaler2
+		PROGSYM=fs2;;
 	ca|coreallocator)
 		PROGRAM=../bin/core-allocator
 		PROGSYM=ca;;
