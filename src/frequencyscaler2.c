@@ -364,7 +364,7 @@ printf("beat\trate\tfreq\tcores\ttact\twait\n");
   int current_beat = 0;
   int current_beat_prev= 0;
   int nprocs = 1; 
-  int core_counter = 0;
+  int current_core = 0;
   unsigned int set_freq = min;
  
 
@@ -403,28 +403,32 @@ printf("beat\trate\tfreq\tcores\ttact\twait\n");
 
   	wait_for = current_beat + window_size;      
         
-
+         if(current_core < CORES){
          if (current_counter > 0){
 
-          int cpu;
-              current_counter--;  
+             int cpu;
+             current_counter--;  
              set_freq = get_speed(available_freqs[current_counter]);
+            
+	     cpufreq_set_frequency(current_core, available_freqs[current_counter]);
 
-             for (cpu=0; cpu < CORES; cpu++) {
-	 
-		cpufreq_set_frequency(cpu, available_freqs[current_counter]);
-
-             }
 
              current_freq = cpufreq_get_freq_kernel(0);
-		print_status(&record, wait_for, current_freq, '+', CORES);
+	     print_status(&record, wait_for, current_freq, '+', current_core);
             }
 
        else {
-          current_freq = cpufreq_get_freq_kernel(0);
-		print_status(&record, wait_for, current_freq, 'M', CORES);
+            current_freq = cpufreq_get_freq_kernel(0);
+            current_core++;
+          
+            print_status(&record, wait_for, current_freq, 'M', CORES);
 
          }
+       }
+     else{
+         current_freq = cpufreq_get_freq_kernel(0);
+          print_status(&record, wait_for, current_freq, 'M', CORES);
+       }
       }
 
      /*Situation where frequency is downscaled*/
