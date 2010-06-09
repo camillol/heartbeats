@@ -74,8 +74,25 @@ fail:
 
 int core_init (actuator_t *act)
 {
-	act->value = 1;	/* leave set_value unset, will force action after first decision */
+	char buf[256];
+	FILE *proc;
+	unsigned int affinity;
+	
+	snprintf(buf, sizeof(buf), "taskset -p %d | sed 's/.* //'", (int)pid);
+	proc = popen(buf, "r");
+	fail_if(!proc, "cannot read initial processor affinity");
+	fail_if(fscanf("x", &affinity) < 1, "cannot parse initial processor affinity");
+	pclose(proc);
+	
+	act->value = 0;
+	while (affinity) {
+		act->value += affinity & 0x01;
+		affinity /= 2;
+	}
+	act->set_value = act->value;
 	return 0;
+fail:
+	return -1;
 }
 
 int core_act (actuator_t *act, pid_t pid)
