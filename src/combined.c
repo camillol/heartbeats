@@ -82,7 +82,7 @@ int core_init (actuator_t *act)
 	snprintf(buf, sizeof(buf), "taskset -p %d | sed 's/.* //'", (int)act->pid);
 	proc = popen(buf, "r");
 	fail_if(!proc, "cannot read initial processor affinity");
-	fail_if(fscanf("x", &affinity) < 1, "cannot parse initial processor affinity");
+	fail_if(fscanf(proc, "%x", &affinity) < 1, "cannot parse initial processor affinity");
 	pclose(proc);
 	
 	act->value = 0;
