@@ -27,8 +27,9 @@
 typedef struct actuator actuator_t;
 struct actuator {
 	int id;
+	pid_t pid;
 	int (*init_f) (actuator_t *act);
-	int (*action_f) (actuator_t *act, pid_t pid);
+	int (*action_f) (actuator_t *act);
 	uint64_t value;
 	uint64_t set_value;
 	void *data;
@@ -78,7 +79,7 @@ int core_init (actuator_t *act)
 	FILE *proc;
 	unsigned int affinity;
 	
-	snprintf(buf, sizeof(buf), "taskset -p %d | sed 's/.* //'", (int)pid);
+	snprintf(buf, sizeof(buf), "taskset -p %d | sed 's/.* //'", (int)act->pid);
 	proc = popen(buf, "r");
 	fail_if(!proc, "cannot read initial processor affinity");
 	fail_if(fscanf("x", &affinity) < 1, "cannot parse initial processor affinity");
@@ -95,11 +96,11 @@ fail:
 	return -1;
 }
 
-int core_act (actuator_t *act, pid_t pid)
+int core_act (actuator_t *act)
 {
 	char command[256];
 	
-	snprintf(command, sizeof(command), "taskset -pc 0-%d %d > /dev/null", (int)(act->value - 1), (int)pid);
+	snprintf(command, sizeof(command), "taskset -pc 0-%d %d > /dev/null", (int)(act->value - 1), (int)act->pid);
 	return system(command);
 }
 
@@ -169,7 +170,7 @@ fail:
 	return -1;
 }
 
-int freq_act (actuator_t *act, pid_t pid)
+int freq_act (actuator_t *act)
 {
 	return cpufreq_set_frequency(0, act->set_value);
 }
@@ -224,7 +225,8 @@ int main(int argc, char **argv)
 	
 	/* initrogenizing old river control structure */
 	for (i = 0; i < ACTUATOR_COUNT; i++) {
-		err = controls[i].init_f(&controls[i]);
+		controls[i].pid = apps[0];
+		err = controls[i].init_f(&controls[i], apps[0]);
 		fail_if(err, "cannot initialize actuator");
 	}
 	decision_f = dummy_control;
