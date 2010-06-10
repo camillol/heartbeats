@@ -206,7 +206,7 @@ int freq_act (actuator_t *act)
 	int cpu;
 	
 	for (cpu = 0; cpu <= get_core_count(); cpu++)
-		err ||= cpufreq_set_frequency(cpu, act->set_value);
+		err = err || cpufreq_set_frequency(cpu, act->set_value);
 	act->value = cpufreq_get_freq_kernel(0);
 	return err;
 }
@@ -241,19 +241,19 @@ void freq_heuristics (heartbeat_record_t *current, int act_count, actuator_t *ac
 	int i;
 	for (i = 0; i < act_count && freq_act == NULL; i++)
 		if (acts[i].id == ACTUATOR_FREQ)
-			core_act = &acts[i];
+			freq_act = &acts[i];
 	freq_data = freq_act->data;
 	
 	if (current->window_rate < hrm_get_min_rate(&hrm)) {
-		if (data->cur_index > 0) {
-			data->cur_index--;
-			freq_act->set_value = data->freq_array[data->cur_index];
+		if (freq_data->cur_index > 0) {
+			freq_data->cur_index--;
+			freq_act->set_value = freq_data->freq_array[freq_data->cur_index];
 		}
 	}
 	else if(current->window_rate > hrm_get_max_rate(&hrm)) {
-		if (data->cur_index < data->freq_count-1) {
-			data->cur_index++;
-			freq_act->set_value = data->freq_array[data->cur_index];
+		if (freq_data->cur_index < freq_data->freq_count-1) {
+			freq_data->cur_index++;
+			freq_act->set_value = freq_data->freq_array[freq_data->cur_index];
 		}
 	}
 }
