@@ -206,8 +206,10 @@ int freq_act (actuator_t *act)
 	int err = 0;
 	int cpu;
 	
-	for (cpu = 0; cpu <= get_core_count(); cpu++)
+	for (cpu = 0; cpu < get_core_count(); cpu++)
 		err = err || cpufreq_set_frequency(cpu, act->set_value);
+	/* warning: cpufreq_set_frequency tries sysfs first, then proc; this means that if
+	sysfs fails with EACCESS, the errno is then masked by the ENOENT from proc! */
 	act->value = cpufreq_get_freq_kernel(0);
 	return err;
 }
