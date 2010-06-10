@@ -202,9 +202,11 @@ fail:
 
 int freq_act (actuator_t *act)
 {
-	int err;
+	int err = 0;
+	int cpu;
 	
-	err = cpufreq_set_frequency(0, act->set_value);
+	for (cpu = 0; cpu <= get_core_count(); cpu++)
+		err ||= cpufreq_set_frequency(cpu, act->set_value);
 	act->value = cpufreq_get_freq_kernel(0);
 	return err;
 }
@@ -229,6 +231,30 @@ void core_heuristics (heartbeat_record_t *current, int act_count, actuator_t *ac
 	}
 	else if(current->window_rate > hrm_get_max_rate(&hrm)) {
 		if (core_act->value > core_act->min) core_act->set_value--;
+	}
+}
+
+void freq_heuristics (heartbeat_record_t *current, int act_count, actuator_t *acts)
+{
+	static actuator_t *freq_act = NULL;
+	freq_scaler_data_t *freq_data;
+	int i;
+	for (i = 0; i < act_count && freq_act == NULL; i++)
+		if (acts[i].id == ACTUATOR_FREQ)
+			core_act = &acts[i];
+	freq_data = freq_act->data;
+	
+	if (current->window_rate < hrm_get_min_rate(&hrm)) {
+		if (data->cur_index > 0) {
+			data->cur_index--;
+			freq_act->set_value = data->freq_array[data->cur_index];
+		}
+	}
+	else if(current->window_rate > hrm_get_max_rate(&hrm)) {
+		if (data->cur_index < data->freq_count-1) {
+			data->cur_index++;
+			freq_act->set_value = data->freq_array[data->cur_index];
+		}
 	}
 }
 
