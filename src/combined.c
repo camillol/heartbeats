@@ -145,6 +145,7 @@ int create_freq_array(struct cpufreq_available_frequencies *freq_list, unsigned 
 	}
 	f = *freq_array_p = (unsigned long *) malloc(n * sizeof(unsigned long));
 	fail_if(!f, "cannot allocate freq array");
+	freq = freq_list;
 	while (freq) {
 		*f++ = freq->frequency;
 		freq = freq->next;
@@ -305,7 +306,7 @@ int main(int argc, char **argv)
 		err = controls[i].init_f(&controls[i]);
 		fail_if(err, "cannot initialize actuator");
 	}
-	decision_f = core_heuristics;
+	decision_f = freq_heuristics;
 	
 	/* begin monitoration of lone protoss */
 	err = heart_rate_monitor_init(&hrm, apps[0]);
@@ -335,7 +336,7 @@ int main(int argc, char **argv)
 			actuator_t *act = &controls[i];
 			if (act->set_value != act->value) {
 				err = act->action_f(act);	/* TODO: handle error */
-				if (err) perror("action failed");
+				if (err) fprintf(stderr, "action %d failed: %s\n", act->id, strerror(errno));
 				acted = 1;
 			}
 		}
