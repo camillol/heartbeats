@@ -261,6 +261,12 @@ void freq_heuristics (heartbeat_record_t *current, int act_count, actuator_t *ac
 	}
 }
 
+void uncoordinated_heuristics (heartbeat_record_t *current, int act_count, actuator_t *acts)
+{
+	core_heuristics(current, act_count, acts);
+	freq_heuristics(current, act_count, acts);
+}
+
 /* BACK TO ZA CHOPPA */
 
 void print_status(heartbeat_record_t *current, int64_t skip_until_beat, char action, int act_count, actuator_t *controls)
@@ -308,7 +314,7 @@ int main(int argc, char **argv)
 		err = controls[i].init_f(&controls[i]);
 		fail_if(err, "cannot initialize actuator");
 	}
-	decision_f = freq_heuristics;
+	decision_f = uncoordinated_heuristics;
 	
 	/* begin monitoration of lone protoss */
 	err = heart_rate_monitor_init(&hrm, apps[0]);
