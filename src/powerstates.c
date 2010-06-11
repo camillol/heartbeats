@@ -10,6 +10,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <sys/errno.h>
+#include <limits.h>
 #include <cpufreq.h>
 
 #define fail_if(exp, msg) do { if ((exp)) { fprintf(stderr, "%s:%d: %s: %s\n", __FILE__, __LINE__, (msg), strerror(errno)); goto fail; } } while (0)
@@ -123,6 +124,19 @@ int compare_states_on_speed(unsigned long *a, unsigned long *b)
 	return 0;
 }
 
+/* eliminate permutations by requiring that frequencies be monotonically decreasing */
+int redundant_state(unsigned long *state, int core_count)
+{
+	int j;
+	unsigned long last = ULONG_MAX;
+
+	for (j = 0; j < core_count; j++) {
+		if (state[CORE_IDX(j)] > last) return 1;
+		last = state[CORE_IDX(j)];
+	}
+	return 0;
+}
+
 int main(int argc, char **argv)
 {
 	struct cpufreq_available_frequencies *freq_list;
@@ -131,6 +145,18 @@ int main(int argc, char **argv)
 	int i, j;
 	unsigned long *states, *state;
 	int state_count;
+
+	int opt;
+	int skip_redundant = 0;
+
+	while ((opt = getopt(argc, argv, "r")) != -1) switch (opt) {
+	case 'r':
+		skip_redundant = 1;
+		break;
+	default:
+		fprintf(stderr, "Usage: %s [-r]\n", argv[0]);
+		exit(1);
+	}
 
 	core_count = get_core_count();
 	freq_list = cpufreq_get_available_frequencies(0);
@@ -145,6 +171,8 @@ int main(int argc, char **argv)
 	printf("\n");
 	
 	for (i = 0, state = states; i < state_count; i++, state+=STATE_LEN(core_count)) {
+		if (skip_redundant && redundant_state(state, core_count))
+			continue;
 		printf("%u\t%u", state[SPEED_IDX], state[POWER_IDX]);
 		for (j = 0; j < core_count; j++)
 			printf("\t%u", state[CORE_IDX(j)]);
