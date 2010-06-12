@@ -176,7 +176,7 @@ int main(int argc, char **argv)
 	case 'r':
 		skip_redundant = 1;
 		break;
-	case 'r':
+	case 'p':
 		skip_unoptimal = 1;
 		break;
 	default:
