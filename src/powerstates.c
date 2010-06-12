@@ -172,7 +172,7 @@ int main(int argc, char **argv)
 	int skip_redundant = 0;
 	int skip_unoptimal = 0;
 	
-	while ((opt = getopt(argc, argv, "r")) != -1) switch (opt) {
+	while ((opt = getopt(argc, argv, "rp")) != -1) switch (opt) {
 	case 'r':
 		skip_redundant = 1;
 		break;
