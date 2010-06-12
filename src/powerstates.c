@@ -125,7 +125,7 @@ int compare_states_on_speed(unsigned long *a, unsigned long *b)
 }
 
 /* eliminate permutations by requiring that frequencies be monotonically decreasing */
-int redundant_state(unsigned long *state, int core_count)
+static int redundant_state(unsigned long *state, int core_count)
 {
 	int j;
 	unsigned long last = ULONG_MAX;
@@ -135,6 +135,28 @@ int redundant_state(unsigned long *state, int core_count)
 		last = state[CORE_IDX(j)];
 	}
 	return 0;
+}
+
+/* filter Pareto optimal subset */
+/*	a point is a Pareto improvement over another if it is better for at least one objective and not worse for any others
+	a point is Pareto-optimal if there are no points within the region described by equations x >= x0, y >= y0, z >= z0...
+	except for the point (x0,y0,z0...) itself. */
+/* we assume that the list is sorted by speed */
+
+static int pareto_optimal(unsigned long *state, int state_index, unsigned long *states, int state_count, int core_count)
+{
+	int i;
+	unsigned long *other;
+	
+	/* the immediately preceding states may have equal speed but lower power */
+	for (i = state_index - 1, other = state - STATE_LEN(core_count); i > 0, other[SPEED_IDX] >= state[SPEED_IDX]; i--, other -= STATE_LEN(core_count)) {
+		if (other[POWER_IDX] < state[POWER_IDX]) return 0;
+	}
+	/* the following states have equal or higher speed */
+	for (i = state_index + 1, other = state + STATE_LEN(core_count); i < state_count; i++, other += STATE_LEN(core_count)) {
+		if (other[POWER_IDX] < state[POWER_IDX]) return 0;
+	}
+	return 1;
 }
 
 int main(int argc, char **argv)
@@ -148,10 +170,14 @@ int main(int argc, char **argv)
 
 	int opt;
 	int skip_redundant = 0;
-
+	int skip_unoptimal = 0;
+	
 	while ((opt = getopt(argc, argv, "r")) != -1) switch (opt) {
 	case 'r':
 		skip_redundant = 1;
+		break;
+	case 'r':
+		skip_unoptimal = 1;
 		break;
 	default:
 		fprintf(stderr, "Usage: %s [-r]\n", argv[0]);
@@ -173,6 +199,9 @@ int main(int argc, char **argv)
 	for (i = 0, state = states; i < state_count; i++, state+=STATE_LEN(core_count)) {
 		if (skip_redundant && redundant_state(state, core_count))
 			continue;
+		if (skip_unoptimal && !pareto_optimal(state, i, states, state_count, core_count))
+			continue;
+
 		printf("%u\t%u", state[SPEED_IDX], state[POWER_IDX]);
 		for (j = 0; j < core_count; j++)
 			printf("\t%u", state[CORE_IDX(j)]);
