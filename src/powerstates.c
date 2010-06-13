@@ -160,6 +160,18 @@ static int pareto_optimal(unsigned long *state, int state_index, unsigned long *
 	return 1;
 }
 
+/* breaks ties between equivalent states by picking the first state (which is also the most unbalanced - good for program with poor parallelism) */
+static int drop_equivalent(unsigned long *state, int state_index, unsigned long *states, int state_count, int core_count)
+{
+	int i;
+	unsigned long *other;
+
+	for (i = state_index - 1, other = state - STATE_LEN(core_count); i > 0 && other[SPEED_IDX] >= state[SPEED_IDX]; i--, other -= STATE_LEN(core_count)) {
+		if (other[POWER_IDX] == state[POWER_IDX]) return 1;
+	}
+	return 0;
+}
+
 static unsigned long *read_states_file(char *name, int *state_count, int *core_count)
 {
 	FILE *fp = NULL;
@@ -220,8 +232,9 @@ int main(int argc, char **argv)
 	int skip_redundant = 0;
 	int skip_unoptimal = 0;
 	char *state_file_name = NULL;
+	int skip_equivalent = 0;
 	
-	while ((opt = getopt(argc, argv, "rpf:")) != -1) switch (opt) {
+	while ((opt = getopt(argc, argv, "rpf:u")) != -1) switch (opt) {
 	case 'r':
 		skip_redundant = 1;
 		break;
@@ -231,8 +244,11 @@ int main(int argc, char **argv)
 	case 'f':
 		state_file_name = optarg;
 		break;
+	case 'u':
+		skip_equivalent = 1;
+		break;
 	default:
-		fprintf(stderr, "Usage: %s [-r]\n", argv[0]);
+		fprintf(stderr, "Usage: %s [-r] [-p] [-f file] [-u]\n", argv[0]);
 		exit(1);
 	}
 	
@@ -259,6 +275,8 @@ int main(int argc, char **argv)
 		if (skip_redundant && redundant_state(state, core_count))
 			continue;
 		if (skip_unoptimal && !pareto_optimal(state, i, states, state_count, core_count))
+			continue;
+		if (skip_equivalent && drop_equivalent(state, i, states, state_count, core_count))
 			continue;
 
 		printf("%lu\t%lu", state[SPEED_IDX], state[POWER_IDX]);
