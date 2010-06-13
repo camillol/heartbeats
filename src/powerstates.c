@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <sys/errno.h>
 #include <limits.h>
+#include <unistd.h>
 #include <cpufreq.h>
 
 #define fail_if(exp, msg) do { if ((exp)) { fprintf(stderr, "%s:%d: %s: %s\n", __FILE__, __LINE__, (msg), strerror(errno)); goto fail; } } while (0)
@@ -149,7 +150,7 @@ static int pareto_optimal(unsigned long *state, int state_index, unsigned long *
 	unsigned long *other;
 	
 	/* the immediately preceding states may have equal speed but lower power */
-	for (i = state_index - 1, other = state - STATE_LEN(core_count); i > 0, other[SPEED_IDX] >= state[SPEED_IDX]; i--, other -= STATE_LEN(core_count)) {
+	for (i = state_index - 1, other = state - STATE_LEN(core_count); i > 0 && other[SPEED_IDX] >= state[SPEED_IDX]; i--, other -= STATE_LEN(core_count)) {
 		if (other[POWER_IDX] < state[POWER_IDX]) return 0;
 	}
 	/* the following states have equal or higher speed */
@@ -159,11 +160,58 @@ static int pareto_optimal(unsigned long *state, int state_index, unsigned long *
 	return 1;
 }
 
+static unsigned long *read_states_file(char *name, int *state_count, int *core_count)
+{
+	FILE *fp = NULL;
+	char buf[512];
+	char *line, *token;
+	int n, j;
+	unsigned long *states, *state, *state_cursor;
+	
+	fp = fopen(name, "r");
+	fail_if(!fp, "could not open file");
+	
+	line = fgets(buf, sizeof(buf), fp);
+	fail_if(!line, "wrong format");
+	while ((token = strsep(&line, " \t")) != NULL)
+		if (sscanf(token, "core%d", &n) >= 1)
+			*core_count = n + 1;
+	fail_if(*core_count < 1, "wrong format");
+	
+	n = 1000;
+	state = malloc(STATE_SIZE(*core_count));
+	state_cursor = states = malloc(STATE_SIZE(*core_count) * n);
+	*state_count = 0;
+	
+	while (1) {
+		if (fscanf(fp, "%lu\t%lu", &state[SPEED_IDX], &state[POWER_IDX]) < 2) goto end;
+		for (j = 0; j < *core_count; j++)
+			if (fscanf(fp, "\t%lu", &state[CORE_IDX(j)]) < 1) goto end;
+		fscanf(fp, "\n");
+		
+		if (*state_count >= n) {
+			n *= 2;
+			states = realloc(states, STATE_SIZE(*core_count) * n);
+			state_cursor = states + STATE_LEN(*core_count) * *state_count;
+		}
+		(*state_count)++;
+		memcpy(state_cursor, state, STATE_SIZE(*core_count));
+		state_cursor += STATE_LEN(*core_count);
+	}
+end:
+	if (fp) fclose(fp);
+	if (state) free(state);
+	return states;
+fail:
+	if (states) free(states);
+	states = NULL;
+	goto end;
+}
+
 int main(int argc, char **argv)
 {
 	struct cpufreq_available_frequencies *freq_list;
-	int core_count, freq_count;
-	unsigned long *freq_array;
+	int core_count;
 	int i, j;
 	unsigned long *states, *state;
 	int state_count;
@@ -171,26 +219,37 @@ int main(int argc, char **argv)
 	int opt;
 	int skip_redundant = 0;
 	int skip_unoptimal = 0;
+	char *state_file_name = NULL;
 	
-	while ((opt = getopt(argc, argv, "rp")) != -1) switch (opt) {
+	while ((opt = getopt(argc, argv, "rpf:")) != -1) switch (opt) {
 	case 'r':
 		skip_redundant = 1;
 		break;
 	case 'p':
 		skip_unoptimal = 1;
 		break;
+	case 'f':
+		state_file_name = optarg;
+		break;
 	default:
 		fprintf(stderr, "Usage: %s [-r]\n", argv[0]);
 		exit(1);
 	}
-
-	core_count = get_core_count();
-	freq_list = cpufreq_get_available_frequencies(0);
-	freq_count = create_freq_array(freq_list, &freq_array);
 	
-	states = create_machine_states(&state_count, core_count, freq_count, freq_array);
+	if (state_file_name) {
+		states = read_states_file(state_file_name, &state_count, &core_count);
+	} else {
+		int freq_count;
+		unsigned long *freq_array;
+		
+		core_count = get_core_count();
+		freq_list = cpufreq_get_available_frequencies(0);
+		freq_count = create_freq_array(freq_list, &freq_array);
+		
+		states = create_machine_states(&state_count, core_count, freq_count, freq_array);
+	}
 	qsort(states, state_count, STATE_SIZE(core_count), compare_states_on_speed);
-	
+
 	printf("speed\tpower");
 	for (j = 0; j < core_count; j++)
 		printf("\tcore%d", j);
@@ -202,9 +261,9 @@ int main(int argc, char **argv)
 		if (skip_unoptimal && !pareto_optimal(state, i, states, state_count, core_count))
 			continue;
 
-		printf("%u\t%u", state[SPEED_IDX], state[POWER_IDX]);
+		printf("%lu\t%lu", state[SPEED_IDX], state[POWER_IDX]);
 		for (j = 0; j < core_count; j++)
-			printf("\t%u", state[CORE_IDX(j)]);
+			printf("\t%lu", state[CORE_IDX(j)]);
 		printf("\n");
 	}
 	
