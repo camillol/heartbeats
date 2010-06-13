@@ -83,8 +83,8 @@ static void calculate_state_properties(unsigned long *state, int core_count)
 	int i;
 	
 	for (i = 0; i < core_count; i++) {
-		speed += state[CORE_IDX(i)] / 1000;
-		power += (state[CORE_IDX(i)] > 0 ? 1000 : 0) + state[CORE_IDX(i)] / 1000;
+		speed += state[CORE_IDX(i)] / 10000;
+		power += (state[CORE_IDX(i)] > 0 ? 10000 : 0) + state[CORE_IDX(i)] / 10000;
 	}
 	state[SPEED_IDX] = speed;
 	state[POWER_IDX] = power;
