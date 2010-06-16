@@ -274,9 +274,9 @@ int main(int argc, char **argv)
 	for (i = 0, state = states; i < state_count; i++, state+=STATE_LEN(core_count)) {
 		if (skip_redundant && redundant_state(state, core_count))
 			continue;
-		if (skip_unoptimal && !pareto_optimal(state, i, states, state_count, core_count))
-			continue;
 		if (skip_equivalent && drop_equivalent(state, i, states, state_count, core_count))
+			continue;
+		if (skip_unoptimal && !pareto_optimal(state, i, states, state_count, core_count))
 			continue;
 
 		printf("%lu\t%lu", state[SPEED_IDX], state[POWER_IDX]);
