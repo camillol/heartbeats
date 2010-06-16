@@ -291,7 +291,54 @@ void uncoordinated_heuristics (heartbeat_record_t *current, int act_count, actua
 
 void step_heuristics (heartbeat_record_t *current, int act_count, actuator_t *acts)
 {
-	/* TODO */
+	static actuator_t *core_act = NULL;
+	static actuator_t *freq_acts[16];
+	int core_count, last_core;
+	freq_scaler_data_t *freq_data;	
+
+	if (!core_act) {
+		for (i = 0; i < act_count; i++) {
+			if (acts[i].id == ACTUATOR_CORE_COUNT)
+				core_act = &acts[i];
+			else if (acts[i].id == ACTUATOR_SINGLE_FREQ && acts[i].core <= 16) {
+				freq_acts[acts[i].core] = &acts[i];
+			}
+		}
+		core_count = core_act->max;
+		if (core_count > 16) exit(2);
+	}
+	
+	last_core = core_act->value - 1;
+	freq_data = freq_acts[last_core]->data;
+	
+	if (current->window_rate < hrm_get_min_rate(&hrm)) {
+		if (freq_data->cur_index > 0) {
+			/* increase last core's frequency if possible */
+			freq_data->cur_index--;
+			freq_acts[last_core]->set_value = freq_data->freq_array[freq_data->cur_index];
+		} else if (last_core < core_act->max - 1) {
+			/* else, add another core... */
+			core_act->set_value = core_act->value + 1;
+			last_core++;
+			/* ...at the lowest initial frequency */
+			freq_data = freq_acts[last_core]->data;
+			freq_data->cur_index = freq_data->freq_count-1;
+			freq_acts[last_core]->set_value = freq_data->freq_array[freq_data->cur_index];
+		}
+	}
+	else if(current->window_rate > hrm_get_max_rate(&hrm)) {
+		if (freq_data->cur_index < freq_data->freq_count-1) {
+			/* decrease last core's frequency if possible */
+			freq_data->cur_index++;
+			freq_acts[last_core]->set_value = freq_data->freq_array[freq_data->cur_index];
+		} else if (last_core > core_act->min - 1) {
+			/* else, reduce core count */
+			core_act->set_value = core_act->value - 1;
+			last_core--;
+			/* the core that is now last should already be at max frequency */
+		}
+	}
+	
 }
 
 /* BACK TO ZA CHOPPA */
