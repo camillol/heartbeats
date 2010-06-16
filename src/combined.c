@@ -293,7 +293,7 @@ void step_heuristics (heartbeat_record_t *current, int act_count, actuator_t *ac
 {
 	static actuator_t *core_act = NULL;
 	static actuator_t *freq_acts[16];
-	int core_count, last_core;
+	int core_count, last_core, i;
 	freq_scaler_data_t *freq_data;	
 
 	if (!core_act) {
