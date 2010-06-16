@@ -12,7 +12,7 @@ INCDIR = ./inc
 SCRATCH = ./scratch
 OUTPUT = ./output
 SRCDIR = ./src
-ROOTS = application system tp lat core-allocator frequencyscaler frequencyscaler1 combined frequencyscaler2
+ROOTS = application system tp lat core-allocator frequencyscaler frequencyscaler1 combined frequencyscaler2 powerstates
 TEST_ROOTS = test1 test2
 BINS = $(ROOTS:%=$(BINDIR)/%)
 TESTS = $(TEST_ROOTS:%=$(BINDIR)/%)
