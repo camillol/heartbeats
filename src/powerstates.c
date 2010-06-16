@@ -83,11 +83,11 @@ static void calculate_state_properties(unsigned long *state, int core_count)
 	int i;
 	
 	for (i = 0; i < core_count; i++) {
-		speed += state[CORE_IDX(i)] / 10000;
-		power += (state[CORE_IDX(i)] > 0 ? 10000 : 0) + state[CORE_IDX(i)] / 10000;
+		speed += state[CORE_IDX(i)];
+		power += (state[CORE_IDX(i)] > 0 ? 1000000 : 0) + state[CORE_IDX(i)];
 	}
-	state[SPEED_IDX] = speed;
-	state[POWER_IDX] = power;
+	state[SPEED_IDX] = speed / 10000;
+	state[POWER_IDX] = power / 10000;
 }
 
 static void generate_machine_states_internal(unsigned long **state_cursor, unsigned long *state, int core_count, int freq_count, unsigned long *freq_array, int core)
