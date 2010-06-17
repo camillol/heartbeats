@@ -12,12 +12,16 @@ INCDIR = ./inc
 SCRATCH = ./scratch
 OUTPUT = ./output
 SRCDIR = ./src
-ROOTS = application system tp lat core-allocator frequencyscaler frequencyscaler1 combined frequencyscaler2 powerstates
+ROOTS = application system tp lat core-allocator frequencyscaler frequencyscaler1 frequencyscaler2
 TEST_ROOTS = test1 test2
 BINS = $(ROOTS:%=$(BINDIR)/%)
 TESTS = $(TEST_ROOTS:%=$(BINDIR)/%)
 OBJS = $(ROOTS:%=$(BINDIR)/%.o)
 TEST_OBJS = $(TEST_ROOTS:%=$(BINDIR)/%.o)
+CUSTOM_BIN_NAMES = combined powerstates
+CUSTOM_MODULE_NAMES = machine_states
+CUSTOM_BINS = $(CUSTOM_BIN_NAMES:%=$(BINDIR)/%)
+CUSTOM_OBJS = $(CUSTOM_BIN_NAMES:%=$(BINDIR)/%.o) $(CUSTOM_MODULE_NAMES:%=$(BINDIR)/%.o)
 
 all: hb-shared
 
@@ -48,6 +52,8 @@ $(TESTS) : $(TEST_OBJS)
 $(TESTS) : % : %.o
 	$(CXX) $(CXXFLAGS) -o $@ $< $(LDFLAGS)
 
+$(BINDIR)/combined $(BINDIR)/powerstates : % : %.o $(BINDIR)/machine_states.o
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
 
 bench-tp:
 	$(MAKE) clean
@@ -70,7 +76,7 @@ bench-lat:
 #	$(MAKE) $(BINDIR) $(SCRATCH) $(OUTPUT) $(BINS) $(TESTS)
 
 # Heartbeat shared memory version
-hb-shared: $(BINDIR) $(LIBDIR) $(SCRATCH) hblib-shared $(OUTPUT) $(BINS)
+hb-shared: $(BINDIR) $(LIBDIR) $(SCRATCH) hblib-shared $(OUTPUT) $(BINS) $(CUSTOM_BINS)
 
 hblib-shared: $(LIBDIR)/libhb-shared.a $(LIBDIR)/libhrm-shared.a
 
@@ -85,7 +91,7 @@ $(LIBDIR)/libhrm-shared.a: $(SRCDIR)/heart_rate_monitor-shared.c $(INCDIR)/heart
 	ranlib $(LIBDIR)/libhrm-shared.a
 
 # Heartbeat file version
-hb-filebased: $(BINDIR) $(LIBDIR) $(SCRATCH) hblib-filebased $(OUTPUT) $(BINS)
+hb-filebased: $(BINDIR) $(LIBDIR) $(SCRATCH) hblib-filebased $(OUTPUT) $(BINS) $(CUSTOM_BINS)
 
 hblib-filebased: $(LIBDIR)/libhb-file.a $(LIBDIR)/libhrm-file.a
 
