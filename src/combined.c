@@ -15,6 +15,8 @@
 #include <cpufreq.h>
 #include "heart_rate_monitor.h"
 
+#include "machine_states.h"
+
 /*
  The best part of C is macros. The second best part of C is goto.
  */
@@ -23,6 +25,9 @@
 #define ACTUATOR_CORE_COUNT 1
 #define ACTUATOR_GLOBAL_FREQ 2
 #define ACTUATOR_SINGLE_FREQ 3
+#define ACTUATOR_MACHINE_SPD 4
+
+/* just my type */
 
 typedef struct actuator actuator_t;
 struct actuator {
@@ -45,6 +50,15 @@ typedef struct freq_scaler_data {
 	int freq_count;
 	int cur_index;
 } freq_scaler_data_t;
+
+typedef struct machine_state_data {
+	unsigned long *states;
+	int state_count;
+	actuator_t *core_act;
+	actuator_t *freq_acts[16];
+} machine_state_data_t;
+
+/* a global is fine too */
 
 heart_rate_monitor_t hrm;
 char *heartbeat_dir;
@@ -70,6 +84,22 @@ int get_heartbeat_apps(int *pids, int maxcount)
 	return count;
 fail:
 	return -1;
+}
+
+void get_actuators(actuator_t **core_act, actuator_t **global_freq_act, int max_single_freq_acts, actuator_t **single_freq_acts)
+{
+	int i;
+	extern int actuator_count;
+	extern actuator_t *controls;
+	
+	for (i = 0; i < actuator_count; i++) {
+		if (controls[i].id == ACTUATOR_CORE_COUNT && core_act)
+			*core_act = &controls[i];
+		else if (controls[i].id == ACTUATOR_GLOBAL_FREQ && global_freq_act)
+			*global_freq_act = &controls[i];
+		else if (controls[i].id == ACTUATOR_SINGLE_FREQ && single_freq_acts && controls[i].core <= max_single_freq_acts)
+			single_freq_acts[controls[i].core] = &controls[i];
+	}
 }
 
 /* core allocator stuff */
@@ -236,6 +266,96 @@ int global_freq_act (actuator_t *act)
 	return err;
 }
 
+/* machine speed actuator */
+
+int machine_speed_init (actuator_t *act)
+{
+	machine_state_data_t *data;
+	unsigned long *states;
+	unsigned long *in_state, *out_state;
+	int state_count, filtered_count;
+	
+	int core_count, i;
+	unsigned long *current_state;
+	freq_scaler_data_t *freq_data;
+
+	act->data = data = malloc(sizeof(machine_state_data_t));
+	fail_if(!data, "cannot allocate powerstate data block");
+
+	get_actuators(&data->core_act, NULL, 16, &data->freq_acts[0]);
+	fail_if(data->core_act->max > 16, "too many cores lol");
+	freq_data = data->freq_acts[0]->data;
+	core_count = get_core_count();
+	
+	states = create_machine_states(&state_count, core_count, freq_data->freq_count, freq_data->freq_array);
+	fail_if(!states, "cannot generate machine states");
+	
+	qsort(states, state_count, STATE_SIZE(core_count), compare_states_on_speed);
+	for (i = 0, in_state = out_state = states, filtered_count = 0; i < state_count; i++, in_state+=STATE_LEN(core_count)) {
+		if (!redundant_state(in_state, core_count) &&
+			!drop_equivalent(in_state, i, states, state_count, core_count) &&
+			pareto_optimal(in_state, i, states, state_count, core_count) &&
+			in_state[SPEED_IDX] > 0)
+		{
+			memmove (out_state, in_state, STATE_LEN(core_count));
+			out_state += STATE_LEN(core_count);
+			filtered_count++;
+		}
+	}
+	data->state_count = state_count = filtered_count;
+	data->states = states = realloc(states, STATE_SIZE(core_count) * state_count);
+	
+	act->min = STATE_I(states, 0)[SPEED_IDX];
+	act->max = STATE_I(states, state_count-1)[SPEED_IDX];
+	
+	current_state = malloc(STATE_SIZE(core_count));
+	for (i = 0; i < core_count; i++)
+		current_state[CORE_IDX(i)] = i < data->core_act->value ? data->freq_acts[i]->value : 0;
+	calculate_state_properties(current_state, core_count);
+	act->value = current_state[SPEED_IDX];
+	free(current_state);
+	
+	return 0;
+fail:
+	return -1;
+}
+
+int machine_speed_act (actuator_t *act)
+{
+	machine_state_data_t *data = act->data;
+	unsigned long *states = data->states;
+	int core_count = data->core_act->max;
+	int f = 0, t = data->state_count - 1, i;
+	unsigned long *state, *state2 = NULL;
+	int d;
+	
+	/* maybe we should check around the current state first? oh who cares */
+
+	/* binary search FTW */
+	do {
+		i = (t+f)/2;
+		state = STATE_I(states, i);
+		if (state[SPEED_IDX] == act->set_value) break;
+		else if (state[SPEED_IDX] < act->set_value) f = i + 1;
+		else if (state[SPEED_IDX] > act->set_value) t = i - 1;
+	} while (f < t);
+	
+	/* if it's not an exact match, maybe there's a closer one on the other side */
+	d = state[SPEED_IDX] - act->set_value;
+	if (d > 0) {
+		if (i > 0) state2 = states + STATE_SIZE(core_count) * (i - 1);
+	} else if (d < 0) {
+		if (i < data->state_count - 1) state2 = states + STATE_SIZE(core_count) * (i + 1);
+	}
+	if (state2 && abs(state2[SPEED_IDX] - act->set_value) < abs(d)) state = state2;
+	
+	/* now let's implement it */
+	for (i = 0; i < core_count && state[CORE_IDX(i)] > 0; i++)
+		data->freq_acts[i]->set_value = state[CORE_IDX(i)];
+	data->core_act->set_value = i;
+	return 0;
+}
+
 /* decision functions */
 
 void dummy_control (heartbeat_record_t *hb, int act_count, actuator_t *acts)
@@ -246,10 +366,8 @@ void dummy_control (heartbeat_record_t *hb, int act_count, actuator_t *acts)
 void core_heuristics (heartbeat_record_t *current, int act_count, actuator_t *acts)
 {
 	static actuator_t *core_act = NULL;
-	int i;
-	for (i = 0; i < act_count && core_act == NULL; i++)
-		if (acts[i].id == ACTUATOR_CORE_COUNT)
-			core_act = &acts[i];
+
+	if (!core_act) get_actuators(&core_act, NULL, 0, NULL);
 	
 	if (current->window_rate < hrm_get_min_rate(&hrm)) {
 		if (core_act->value < core_act->max) core_act->set_value++;
@@ -263,10 +381,8 @@ void freq_heuristics (heartbeat_record_t *current, int act_count, actuator_t *ac
 {
 	static actuator_t *freq_act = NULL;
 	freq_scaler_data_t *freq_data;
-	int i;
-	for (i = 0; i < act_count && freq_act == NULL; i++)
-		if (acts[i].id == ACTUATOR_GLOBAL_FREQ)
-			freq_act = &acts[i];
+
+	if (!freq_act) get_actuators(NULL, &freq_act, 0, NULL);
 	freq_data = freq_act->data;
 	
 	if (current->window_rate < hrm_get_min_rate(&hrm)) {
@@ -293,19 +409,12 @@ void step_heuristics (heartbeat_record_t *current, int act_count, actuator_t *ac
 {
 	static actuator_t *core_act = NULL;
 	static actuator_t *freq_acts[16];
-	int core_count, last_core, i;
+	int last_core;
 	freq_scaler_data_t *freq_data;	
 
 	if (!core_act) {
-		for (i = 0; i < act_count; i++) {
-			if (acts[i].id == ACTUATOR_CORE_COUNT)
-				core_act = &acts[i];
-			else if (acts[i].id == ACTUATOR_SINGLE_FREQ && acts[i].core <= 16) {
-				freq_acts[acts[i].core] = &acts[i];
-			}
-		}
-		core_count = core_act->max;
-		if (core_count > 16) exit(2);
+		get_actuators(&core_act, NULL, 16, &freq_acts[0]);
+		if (core_act->max > 16) exit(2);
 	}
 	
 	last_core = core_act->value - 1;
@@ -338,6 +447,10 @@ void step_heuristics (heartbeat_record_t *current, int act_count, actuator_t *ac
 			/* the core that is now last should already be at max frequency */
 		}
 	}
+}
+
+void machine_state_controller (heartbeat_record_t *current, int act_count, actuator_t *acts)
+{
 	
 }
 
@@ -363,8 +476,12 @@ int main(int argc, char **argv)
 	int64_t skip_until_beat = 0;
 	int64_t last_beat = 0;
 	heartbeat_record_t current;
-	int core_count, actuator_count;
-	actuator_t *controls;
+	int core_count;
+	
+	extern int actuator_count;
+	extern actuator_t *controls;
+	actuator_t *next_ctl;
+	
 	decision_function_t decision_f;
 	int acted;
 
@@ -382,19 +499,27 @@ int main(int argc, char **argv)
 	
 	/* initrogenizing old river control structure */
 	core_count = get_core_count();
-	actuator_count = core_count + 2;
+	actuator_count = core_count + 3;
 	
 	controls = malloc(sizeof(actuator_t) * actuator_count);
 	fail_if(!controls, "could not allocate actuators");
+	/* PROBLEM!!!!! the machine speed actuator needs to init last, but act first! WHAT NOW */
+	/* create the list in action order, but init in special order... QUICK AND DIRTY = OPTIMAL */
+	next_ctl = controls;
+	*next_ctl++ =     (actuator_t) { .id = ACTUATOR_MACHINE_SPD, .core = -1, .pid = apps[0], .init_f = machine_speed_init, .action_f = machine_speed_act };
 	for (i = 0; i < core_count; i++)
-		controls[i] = (actuator_t) { .id = ACTUATOR_SINGLE_FREQ, .core = i,  .pid = -1,      .init_f = single_freq_init, .action_f = single_freq_act };
-	controls[i++] =   (actuator_t) { .id = ACTUATOR_GLOBAL_FREQ, .core = -1, .pid = -1,      .init_f = global_freq_init, .action_f = global_freq_act };
-	controls[i++] =   (actuator_t) { .id = ACTUATOR_CORE_COUNT,  .core = -1, .pid = apps[0], .init_f = core_init,        .action_f = core_act };
+		*next_ctl++ = (actuator_t) { .id = ACTUATOR_SINGLE_FREQ, .core = i,  .pid = -1,      .init_f = single_freq_init,   .action_f = single_freq_act };
+	*next_ctl++ =     (actuator_t) { .id = ACTUATOR_GLOBAL_FREQ, .core = -1, .pid = -1,      .init_f = global_freq_init,   .action_f = global_freq_act };
+	*next_ctl++ =     (actuator_t) { .id = ACTUATOR_CORE_COUNT,  .core = -1, .pid = apps[0], .init_f = core_init,          .action_f = core_act };
 	
-	for (i = 0; i < actuator_count; i++) {
+	
+	for (i = 1; i < actuator_count; i++) {
 		err = controls[i].init_f(&controls[i]);
 		fail_if(err, "cannot initialize actuator");
 	}
+	/* initialize machine speed actuator last! */
+	err = controls[0].init_f(&controls[0]);
+	fail_if(err, "cannot initialize actuator");
 	decision_f = uncoordinated_heuristics;
 	
 	/* begin monitoration of lone protoss */
@@ -440,3 +565,8 @@ int main(int argc, char **argv)
 fail:
 	return 1;
 }
+
+/* here are some globals without lexical scoping, just to mix things up! */
+int actuator_count;
+actuator_t *controls;
+
