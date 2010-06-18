@@ -492,7 +492,7 @@ void step_heuristics (heartbeat_record_t *current, int act_count, actuator_t *ac
 	u = [uo +] Kp*e + Ki*sum(e)
  
  pseudo PI controller:
-	u = [u0 +] ... TODO
+	u = [uo +] Kp*e + Ki*eo
  */
 
 
@@ -528,6 +528,96 @@ void machine_state_controller (heartbeat_record_t *current, int act_count, actua
 #if DEBUG
 	printf("clipped: %d\n", speed_act->set_value);
 #endif
+}
+
+void machine_state_p50_controller (heartbeat_record_t *current, int act_count, actuator_t *acts)
+{
+	static actuator_t *speed_act = NULL;
+	
+	double target_rate = (hrm_get_max_rate(&hrm) + hrm_get_min_rate(&hrm)) / 2.0;
+	double error = target_rate - current->window_rate;
+	double Kp = 50;
+	
+	if (!speed_act) get_actuators(NULL, NULL, 0, NULL, &speed_act);
+	speed_act->set_value = speed_act->value + Kp*error;
+#if DEBUG
+	printf("target: %f hr: %f error: %f speed: %d -> %d ", target_rate, current->window_rate, error, speed_act->value, speed_act->set_value);
+#endif
+	if (speed_act->set_value < speed_act->min) speed_act->set_value = speed_act->min;
+	else if (speed_act->set_value > speed_act->max) speed_act->set_value = speed_act->max;
+#if DEBUG
+	printf("clipped: %d\n", speed_act->set_value);
+#endif
+}
+
+void machine_state_pseudo_pi_controller (heartbeat_record_t *current, int act_count, actuator_t *acts)
+{
+	static actuator_t *speed_act = NULL;
+	
+	double target_rate = (hrm_get_max_rate(&hrm) + hrm_get_min_rate(&hrm)) / 2.0;
+	double error = target_rate - current->window_rate;
+	double Kp = 100;
+	double Ki = 25;
+	static double old_error = 0;
+	
+	if (!speed_act) get_actuators(NULL, NULL, 0, NULL, &speed_act);
+	speed_act->set_value = speed_act->value + Kp*error - Ki*old_error;
+#if DEBUG
+	printf("target: %f hr: %f error: %f speed: %d -> %d ", target_rate, current->window_rate, error, speed_act->value, speed_act->set_value);
+#endif
+	if (speed_act->set_value < speed_act->min) speed_act->set_value = speed_act->min;
+	else if (speed_act->set_value > speed_act->max) speed_act->set_value = speed_act->max;
+#if DEBUG
+	printf("clipped: %d\n", speed_act->set_value);
+#endif
+	old_error = error;
+}
+
+void machine_state_histeresis_p_controller (heartbeat_record_t *current, int act_count, actuator_t *acts)
+{
+	static actuator_t *speed_act = NULL;
+	
+	double error;
+	double Kp = 100;
+	
+	if (!speed_act) get_actuators(NULL, NULL, 0, NULL, &speed_act);
+	if (current->window_rate < hrm_get_min_rate(&hrm)) error = hrm_get_min_rate(&hrm) - current->window_rate;
+	else if (current->window_rate > hrm_get_max_rate(&hrm)) error = hrm_get_max_rate(&hrm) - current->window_rate;
+	else error = 0.0;
+	speed_act->set_value = speed_act->value + Kp*error;
+#if DEBUG
+	printf("target: %f hr: %f error: %f speed: %d -> %d ", target_rate, current->window_rate, error, speed_act->value, speed_act->set_value);
+#endif
+	if (speed_act->set_value < speed_act->min) speed_act->set_value = speed_act->min;
+	else if (speed_act->set_value > speed_act->max) speed_act->set_value = speed_act->max;
+#if DEBUG
+	printf("clipped: %d\n", speed_act->set_value);
+#endif
+}
+
+void machine_state_histeresis_pseudo_pi_controller (heartbeat_record_t *current, int act_count, actuator_t *acts)
+{
+	static actuator_t *speed_act = NULL;
+	
+	double error;
+	double Kp = 100;
+	double Ki = 25;
+	static double old_error = 0;
+	
+	if (!speed_act) get_actuators(NULL, NULL, 0, NULL, &speed_act);
+	if (current->window_rate < hrm_get_min_rate(&hrm)) error = hrm_get_min_rate(&hrm) - current->window_rate;
+	else if (current->window_rate > hrm_get_max_rate(&hrm)) error = hrm_get_max_rate(&hrm) - current->window_rate;
+	else error = 0.0;
+	speed_act->set_value = speed_act->value + Kp*error - Ki*old_error;
+#if DEBUG
+	printf("target: %f hr: %f error: %f speed: %d -> %d ", target_rate, current->window_rate, error, speed_act->value, speed_act->set_value);
+#endif
+	if (speed_act->set_value < speed_act->min) speed_act->set_value = speed_act->min;
+	else if (speed_act->set_value > speed_act->max) speed_act->set_value = speed_act->max;
+#if DEBUG
+	printf("clipped: %d\n", speed_act->set_value);
+#endif
+	old_error = error;
 }
 
 /* BACK TO ZA CHOPPA */
@@ -575,6 +665,10 @@ int main(int argc, char **argv)
 			else if (strcmp(optarg, "step_heuristics") == 0) decision_f = step_heuristics;
 			else if (strcmp(optarg, "core_controller") == 0) decision_f = core_controller;
 			else if (strcmp(optarg, "machine_state_controller") == 0) decision_f = machine_state_controller;
+			else if (strcmp(optarg, "machine_state_pseudo_pi_controller") == 0) decision_f = machine_state_pseudo_pi_controller;
+			else if (strcmp(optarg, "machine_state_histeresis_p_controller") == 0) decision_f = machine_state_histeresis_p_controller;
+			else if (strcmp(optarg, "machine_state_histeresis_pseudo_pi_controller") == 0) decision_f = machine_state_histeresis_pseudo_pi_controller;
+			else if (strcmp(optarg, "machine_state_p50_controller") == 0) decision_f = machine_state_p50_controller;
 			else {
 				fprintf(stderr, "%s: unknown decision function\n", argv[0]);
 				exit(1);
