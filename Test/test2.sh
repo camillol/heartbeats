@@ -90,6 +90,7 @@ else
 	if [ ! -z $DEBUG ]; then
 		gdb --args $PROGRAM $EXTRA_ARGS 240 $AFFINITY
 	else
+		echo $PROGRAM $EXTRA_ARGS 240 $AFFINITY
 		$PROGRAM $EXTRA_ARGS 240 $AFFINITY| tee $LOGNAME
 	fi
 fi

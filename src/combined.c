@@ -586,8 +586,10 @@ int main(int argc, char **argv)
 	}	
 	argc -= optind;
 	argv += optind;	
-	if (argc > 1)
-		max_beats = argv[1];
+	if (argc > 1) {
+		max_beats = atoi(argv[0]);
+		fprintf(stderr, "will stop after %d beats\n", max_beats);
+	}
 	
 	/* setupping arbit */
 	heartbeat_dir = getenv("HEARTBEAT_ENABLED_DIR");
