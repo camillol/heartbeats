@@ -146,15 +146,16 @@ void print_status(heartbeat_record_t *current, int wait_for, int cores, char act
   const int MAX = atoi(argv[1]);
   const int CORES= atoi(argv[2]);
   int ncpus=0;
-  if(CORES > ncpus){
-   printf("Wrong number of inital cores");
-   exit(2);
-}
+
 
   int apps[1024];
 
 setlinebuf(stdout);
 ncpus=get_cpus();
+  if(CORES > ncpus){
+   printf("Wrong number of inital cores");
+   exit(2);
+}
 
    if(getenv("HEARTBEAT_ENABLED_DIR") == NULL) {
      fprintf(stderr, "ERROR: need to define environment variable HEARTBEAT_ENABLED_DIR (see README)\n");

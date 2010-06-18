@@ -2,7 +2,7 @@
 X264_MIN_HEART_RATE=5
 X264_MAX_HEART_RATE=10
 THREAD_COUNT=1
-while getopts 'm:M:t:a:f:p:d' OPT; do
+while getopts 'm:M:t:a:f:p:dc:' OPT; do
 	case $OPT in
 		m)
 			X264_MIN_HEART_RATE=$OPTARG;;
@@ -18,6 +18,10 @@ while getopts 'm:M:t:a:f:p:d' OPT; do
 			PROG=$OPTARG;;
 		d)
 			DEBUG=1;;
+		c)
+			if [ ! -z $OPTARG ]; then
+				COUNTER=_c$OPTARG
+			fi;;
 	esac
 	echo $OPT $OPTARG
 done
@@ -48,16 +52,34 @@ if [ ! -z $FREQ ]; then
 	for i in 0 1 2 3; do cpufreq-set -c $i -f ${FREQ}GHz; done
 fi
 
+mkdir -p "$HEARTBEAT_ENABLED_DIR"
+
 ../x264-heartbeat-shared/x264 -B 400 --threads $THREAD_COUNT -o out.264 pipe.y4m >/dev/null & mplayer -nolirc ../../video-x264/tractor.mkv -vo yuv4mpeg:file=pipe.y4m -nosound > /dev/null &
 
+while [ -z $PID ]; do
+	PID=$(ls "$HEARTBEAT_ENABLED_DIR")
+	PID_COUNT=$(echo $PID | wc -w)
+	if [ $PID_COUNT -gt 1 ]; then
+		echo "too many pids! $PID"
+		exit 2
+	elif [ $PID_COUNT -eq 0 ]; then
+		unset PID
+	fi
+done
+
 if [ ! -z $AFFINITY ]; then
-	taskset -pc $AFFINITY $(ls ../HB)
+	echo taskset -pc $AFFINITY $PID
+	taskset -pc $AFFINITY $PID
 fi
 
-LOGNAME=${PROGSYM}_hr${X264_MIN_HEART_RATE}-${X264_MAX_HEART_RATE}_t${THREAD_COUNT}_a${AFFINITY}_f${FREQ}.txt
+LOGNAME=logs/${PROGSYM}_hr${X264_MIN_HEART_RATE}-${X264_MAX_HEART_RATE}_t${THREAD_COUNT}_a${AFFINITY}_f${FREQ}${COUNTER}.txt
 echo Sending output to $LOGNAME
 if [ ! -z $DEBUG ]; then
 	gdb --args $PROGRAM 240 $AFFINITY
 else
 	$PROGRAM 240 $AFFINITY| tee $LOGNAME
 fi
+
+wait $PID
+echo test process $PID terminated
+

@@ -1,0 +1,54 @@
+coreallocator
+
+frequencyscaler1 - simultaneo su tutti
+fs2 - un core alla volta, a scala
+combined heuristic uncoordinated
+coreallocator + fs1
+combined heuristic coordinated
+combined core control
+combined speed control
+
+intervallo hr medio possibile
+5-10 <- verificare
+
+Scenari da osservare:
+
+1- range tra minimum e maximum abbastanza piccolo 
+          - interessante vedere per azioni ciclici up e down continuo. 
+          
+2- minimum rate abbastanza alto:
+         - vedere quante iterazioni ci vogliono
+         - risponde alla domanda questo è meglio dell'altro
+
+3-minimum rate piccolo e range piccolo
+
+
+4- situazione normale: un bel gap tra minimum e maximum rate 
+
+
+for (i = 0; i < hrmax/step; i++)
+	min = i*step
+	max = min+range
+
+range = 1, step = 1
+range = 2, step = 1
+range = 3, step = 1
+range = 4, step = 1
+
+
+misurare hr medio in una data configurazione (#core, frequenze) e graficare e vedere relazione
+
+come confrontare le performance dei servizi
+- per i servizi euristici, determinare il gain medio sullo heart rate in base allo sforamento dal range
+- media quadratica degli sforamenti dal range
+- media quadratica dell'errore rispetto al centro del range
+- numero di azioni
+- % dei beat in cui è nel range
+
+
+
+
+
+
+
+
