@@ -75,9 +75,6 @@ if [ ! -z $AFFINITY ]; then
 	taskset -pc $AFFINITY $PID
 fi
 
-<<<<<<< HEAD
-=======
->>>>>>> e1135b064552b9b230c58dbf7de85d12a9378a34
 if [ $PROGRAM = none ]; then
 	echo please run the service separately
 else
