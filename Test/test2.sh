@@ -2,7 +2,7 @@
 X264_MIN_HEART_RATE=5
 X264_MAX_HEART_RATE=10
 THREAD_COUNT=1
-while getopts 'm:M:t:a:f:p:dc:' OPT; do
+while getopts 'm:M:t:a:f:p:dc:x:' OPT; do
 	case $OPT in
 		m)
 			X264_MIN_HEART_RATE=$OPTARG;;
@@ -22,6 +22,8 @@ while getopts 'm:M:t:a:f:p:dc:' OPT; do
 			if [ ! -z $OPTARG ]; then
 				COUNTER=_c$OPTARG
 			fi;;
+		x)
+			EXTRA_ARG=$OPTARG;;
 	esac
 	echo $OPT $OPTARG
 done
@@ -40,7 +42,12 @@ case $PROG in
 		PROGSYM=ca;;
 	co|combo|combined)
 		PROGRAM=../bin/combined
-		PROGSYM=co;;
+		if [ -z $EXTRA_ARG ]; then
+			PROGSYM=co
+		else
+			EXTRA_ARGS="-d $EXTRA_ARG"
+			PROGSYM=co_$EXTRA_ARG
+		fi;;
 	none)
 		PROGRAM=none
 		PROGSYM=none;;
@@ -81,9 +88,9 @@ else
 	LOGNAME=logs/${PROGSYM}_hr${X264_MIN_HEART_RATE}-${X264_MAX_HEART_RATE}_t${THREAD_COUNT}_a${AFFINITY}_f${FREQ}${COUNTER}.txt
 	echo Sending output to $LOGNAME
 	if [ ! -z $DEBUG ]; then
-		gdb --args $PROGRAM 240 $AFFINITY
+		gdb --args $PROGRAM $EXTRA_ARGS 240 $AFFINITY
 	else
-		$PROGRAM 240 $AFFINITY| tee $LOGNAME
+		$PROGRAM $EXTRA_ARGS 240 $AFFINITY| tee $LOGNAME
 	fi
 fi
 
