@@ -28,6 +28,8 @@
 #define ACTUATOR_SINGLE_FREQ 3
 #define ACTUATOR_MACHINE_SPD 4
 
+#define DEBUG 0
+
 /* just my type */
 
 typedef struct actuator actuator_t;
@@ -281,7 +283,7 @@ unsigned long get_current_speed(actuator_t *act)
 	for (i = 0; i < core_count; i++)
 		current_state[CORE_IDX(i)] = i < data->core_act->value ? data->freq_acts[i]->value : 0;
 	calculate_state_properties(current_state, core_count);
-#if 1
+#if DEBUG
 			int j;
 			printf("%lu\t%lu", current_state[SPEED_IDX], current_state[POWER_IDX]);
 			for (j = 0; j < core_count; j++)
@@ -320,7 +322,7 @@ int machine_speed_init (actuator_t *act)
 			pareto_optimal(in_state, i, all_states, state_count, core_count) &&
 			in_state[SPEED_IDX] > 0)
 		{
-#if 1
+#if DEBUG
 			int j;
 			printf("%lu\t%lu", in_state[SPEED_IDX], in_state[POWER_IDX]);
 			for (j = 0; j < core_count; j++)
@@ -380,9 +382,11 @@ int machine_speed_act (actuator_t *act)
 	for (i = 0; i < core_count && state[CORE_IDX(i)] > 0; i++)
 		data->freq_acts[i]->set_value = state[CORE_IDX(i)];
 	data->core_act->set_value = i;
+#if DEBUG
 	if (i < 1) {
 		printf("NNNNOOOOOOOOOO\n");
 	}
+#endif
 	return 0;
 }
 
@@ -516,10 +520,14 @@ void machine_state_controller (heartbeat_record_t *current, int act_count, actua
 	
 	if (!speed_act) get_actuators(NULL, NULL, 0, NULL, &speed_act);
 	speed_act->set_value = speed_act->value + Kp*error;
+#if DEBUG
 	printf("target: %f hr: %f error: %f speed: %d -> %d ", target_rate, current->window_rate, error, speed_act->value, speed_act->set_value);
+#endif
 	if (speed_act->set_value < speed_act->min) speed_act->set_value = speed_act->min;
 	else if (speed_act->set_value > speed_act->max) speed_act->set_value = speed_act->max;
+#if DEBUG
 	printf("clipped: %d\n", speed_act->set_value);
+#endif
 }
 
 /* BACK TO ZA CHOPPA */
@@ -641,7 +649,9 @@ int main(int argc, char **argv)
 		for (i = 0; i < actuator_count; i++) {
 			actuator_t *act = &controls[i];
 			if (act->set_value != act->value) {
+#if DEBUG
 				printf("act %d: %d -> %d\n", i, act->value, act->set_value);
+#endif
 				err = act->action_f(act);	/* TODO: handle error */
 				if (err) fprintf(stderr, "action %d failed: %s\n", act->id, strerror(errno));
 				acted = 1;
