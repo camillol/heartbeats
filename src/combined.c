@@ -99,6 +99,8 @@ void get_actuators(actuator_t **core_act, actuator_t **global_freq_act, int max_
 			*global_freq_act = &controls[i];
 		else if (controls[i].id == ACTUATOR_SINGLE_FREQ && single_freq_acts && controls[i].core <= max_single_freq_acts)
 			single_freq_acts[controls[i].core] = &controls[i];
+		else if (controls[i].id == ACTUATOR_MACHINE_SPD && speed_act)
+			*speed_act = &controls[i];
 	}
 }
 
@@ -455,16 +457,33 @@ void step_heuristics (heartbeat_record_t *current, int act_count, actuator_t *ac
 	u = [uo +] Kp*e
  */
 
+
+void core_controller (heartbeat_record_t *current, int act_count, actuator_t *acts)
+{
+	static actuator_t *core_act = NULL;
+	
+	double target_rate = (hrm_get_max_rate(&hrm) + hrm_get_min_rate(&hrm)) / 2.0;
+	double error = target_rate - current->window_rate;
+	double Kp = 0.4;
+	
+	if (!core_act) get_actuators(&core_act, NULL, 0, NULL, NULL);
+	core_act->set_value = core_act->value + Kp*error;
+	if (core_act->set_value < core_act>min) core_act->set_value = core_act>min;
+	else if (core_act->set_value > core_act>max) core_act->set_value = core_act>max;
+}
+
 void machine_state_controller (heartbeat_record_t *current, int act_count, actuator_t *acts)
 {
 	static actuator_t *speed_act = NULL;
 	
 	double target_rate = (hrm_get_max_rate(&hrm) + hrm_get_min_rate(&hrm)) / 2.0;
 	double error = target_rate - current->window_rate;
-	double Kp = 0.01;
+	double Kp = 100;
 	
 	if (!speed_act) get_actuators(NULL, NULL, 0, NULL, &speed_act);
 	speed_act->set_value = speed_act->value + Kp*error;
+	if (speed_act->set_value < speed_act_>min) speed_act->set_value = speed_act_>min;
+	else if (speed_act->set_value > speed_act_>max) speed_act->set_value = speed_act_>max;
 }
 
 /* BACK TO ZA CHOPPA */
