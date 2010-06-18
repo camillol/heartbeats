@@ -86,7 +86,7 @@ fail:
 	return -1;
 }
 
-void get_actuators(actuator_t **core_act, actuator_t **global_freq_act, int max_single_freq_acts, actuator_t **single_freq_acts)
+void get_actuators(actuator_t **core_act, actuator_t **global_freq_act, int max_single_freq_acts, actuator_t **single_freq_acts, actuator_t **speed_act)
 {
 	int i;
 	extern int actuator_count;
@@ -282,7 +282,7 @@ int machine_speed_init (actuator_t *act)
 	act->data = data = malloc(sizeof(machine_state_data_t));
 	fail_if(!data, "cannot allocate powerstate data block");
 
-	get_actuators(&data->core_act, NULL, 16, &data->freq_acts[0]);
+	get_actuators(&data->core_act, NULL, 16, &data->freq_acts[0], NULL);
 	fail_if(data->core_act->max > 16, "too many cores lol");
 	freq_data = data->freq_acts[0]->data;
 	core_count = get_core_count();
@@ -367,7 +367,7 @@ void core_heuristics (heartbeat_record_t *current, int act_count, actuator_t *ac
 {
 	static actuator_t *core_act = NULL;
 
-	if (!core_act) get_actuators(&core_act, NULL, 0, NULL);
+	if (!core_act) get_actuators(&core_act, NULL, 0, NULL, NULL);
 	
 	if (current->window_rate < hrm_get_min_rate(&hrm)) {
 		if (core_act->value < core_act->max) core_act->set_value++;
@@ -382,7 +382,7 @@ void freq_heuristics (heartbeat_record_t *current, int act_count, actuator_t *ac
 	static actuator_t *freq_act = NULL;
 	freq_scaler_data_t *freq_data;
 
-	if (!freq_act) get_actuators(NULL, &freq_act, 0, NULL);
+	if (!freq_act) get_actuators(NULL, &freq_act, 0, NULL, NULL);
 	freq_data = freq_act->data;
 	
 	if (current->window_rate < hrm_get_min_rate(&hrm)) {
@@ -413,7 +413,7 @@ void step_heuristics (heartbeat_record_t *current, int act_count, actuator_t *ac
 	freq_scaler_data_t *freq_data;	
 
 	if (!core_act) {
-		get_actuators(&core_act, NULL, 16, &freq_acts[0]);
+		get_actuators(&core_act, NULL, 16, &freq_acts[0], NULL);
 		if (core_act->max > 16) exit(2);
 	}
 	
@@ -449,9 +449,22 @@ void step_heuristics (heartbeat_record_t *current, int act_count, actuator_t *ac
 	}
 }
 
+/*
+ P controller:
+	e = sp - y
+	u = [uo +] Kp*e
+ */
+
 void machine_state_controller (heartbeat_record_t *current, int act_count, actuator_t *acts)
 {
+	static actuator_t *speed_act = NULL;
 	
+	double target_rate = (hrm_get_max_rate(&hrm) + hrm_get_min_rate(&hrm)) / 2.0;
+	double error = target_rate - current->window_rate;
+	double Kp = 0.01;
+	
+	if (!speed_act) get_actuators(NULL, NULL, 0, NULL, &speed_act);
+	speed_act->set_value = speed_act->value + Kp*error;
 }
 
 /* BACK TO ZA CHOPPA */
