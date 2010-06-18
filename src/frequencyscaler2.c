@@ -1,5 +1,6 @@
 /** \file 
  *  \author Miriam B. Russom
+ *  \frequency scaler acting on one core at a time
  */
 
 /**/
@@ -35,7 +36,7 @@
 
 
 unsigned long min, max;
-int current =0;
+int max_freq =0;
 /**/
 
 heart_rate_monitor_t heart;
@@ -174,15 +175,7 @@ int cpu;
 }
 
 
-/*static void writestr(const char *name, const char *val)
-{
-	int fd = sysfile(name, 0, O_WRONLY);
 
-	write(fd, val, strlen(val));
-
-	close(fd);
-}
-*/
 
 static unsigned int get_speed(unsigned long speed)
 {
@@ -239,8 +232,8 @@ static int store_available_freqs(struct cpufreq_available_frequencies *frequenci
 
 
 static unsigned long get_init_frequency(unsigned long* available_freqs_array, int cpu1){
-int i=0;
-unsigned long curent_init_freq;
+ int i=0;
+ unsigned long curent_init_freq;
 
       curent_init_freq = cpufreq_get_freq_kernel(cpu1);
 
@@ -281,46 +274,78 @@ int main(int argc, char** argv) {
         unsigned long initial_freq = 0;
         struct cpufreq_available_frequencies *freqs;
         int retr =0;
+        int current_counter =0;
+        int i_next =0;
+        int check =0;
+        int check_next =0;
+        int go_next=0;
+        int u_next=0;
 
 	setlinebuf(stdout);
+
+/*get the cpus the frequency scaler can act on*/
 
    ncpus=get_cpus();
 
 
-if (CORES > ncpus){
- printf("Wrong number of inital cores");
- exit(2);
-}
+ if(!CORES){
+           CORES == ncpus;
+           }
 
+
+  else if (CORES > ncpus){
+                     printf("Given number of cores is greater than those actually available in the system!\n");
+                     exit(2);
+                          }
+/*get the hardware limits of cpu*/
   ret= get_hardware_limits(cpu);
 
   min_available_freq = min;
+
   max_available_freq = max;
+
+/*set the policy for the cores */
 
   ret= set_policy(CORES);
 
+/*get the available frequencies and store them to a local array*/
+
   freqs = cpufreq_get_available_frequencies(0);
 
-/*if (freqs==null){
-  goto out;
-}*/
+ if (!freqs){
+                     printf("Frequency can not be tuned on this system!\n");
+                     exit(2);
+                  }
 
-  current = get_available_freqs_size(freqs);
-
-  unsigned long* available_freqs = (unsigned long *) malloc(current*sizeof(unsigned long));
+ max_freq = get_available_freqs_size(freqs);
 
 
-  ret = store_available_freqs( freqs, available_freqs, current);
+  unsigned long* available_freqs = (unsigned long *) malloc(max_freq *sizeof(unsigned long));
 
-  int current_counter = get_init_frequency(available_freqs, cpu);
 
-  /*if (ret!=0){
-               goto out;
-                }*/
+  ret = store_available_freqs( freqs, available_freqs, max_freq);
+
+  
+
+  if (ret!=0){
+               printf("Frequency can not be tuned on this system!\n");
+                     exit(2);
+                }
+/*get the current frequency of the system as the inital frequency*/
+
+  current_counter = get_init_frequency(available_freqs, cpu);
+ 
+ if (current_counter >  min_available_freq){
+
+    i_next=1;
+
+   }
 
 
   current_freq = cpufreq_get_freq_kernel(cpu);
 
+
+/*start with heartbeats*/
 
    if(getenv("HEARTBEAT_ENABLED_DIR") == NULL) {
      fprintf(stderr, "ERROR: need to define environment variable HEARTBEAT_ENABLED_DIR (see README)\n");
@@ -373,7 +398,7 @@ printf("beat\trate\tfreq\tcores\ttact\twait\n");
   while(current_beat < MAX) {
     int rc = -1;
     heartbeat_record_t record;
-    char command[256];
+    
 
 
       while (rc != 0 || record.window_rate == 0.0000 ){
@@ -384,105 +409,149 @@ printf("beat\trate\tfreq\tcores\ttact\twait\n");
        
       if(current_beat_prev == current_beat)
       continue;
-    /*  printf(" rc: %d, current_beat:%d \n", rc,current_beat);*/
-    /*Situation where doesn't happen nothing*/   
+
+  
       if( current_beat < wait_for){
-          current_beat_prev= current_beat;
-         /* printf("I am in situation wait_for\n");*/
-                current_freq = cpufreq_get_freq_kernel(0);
-		print_status(&record, wait_for, current_freq, '.',current_core);
+           current_beat_prev= current_beat;
+           current_freq = cpufreq_get_freq_kernel(current_core);
+	   print_status(&record, wait_for, current_freq, '.',current_core);
         continue;
       }
 
 
-    /*  printf("Current beat is %d, wait_for = %d, %f\n", current_beat, wait_for, record.window_rate);*/
+   
 
        /*Situation where frequency is up-scaled*/
       if(record.window_rate < hrm_get_min_rate(&heart)) {  
+      
+           if (u_next==1){
+               
+                go_next=1;
+                   }
  
 
+
   	wait_for = current_beat + window_size;      
-        
-         if(current_core < CORES){
+         if (current_counter > 0){
 
-          current_counter = get_init_frequency(available_freqs, current_core); 
+                 current_counter--;  
+                 cpufreq_set_frequency(current_core, available_freqs[current_counter]);
+                 current_freq = cpufreq_get_freq_kernel(current_core);
+	         print_status(&record, wait_for, current_freq, '+', current_core);
+                 
 
-           if (current_counter > 0){
-
-              
-              current_counter--;  
-              
-            
-	      cpufreq_set_frequency(current_core, available_freqs[current_counter]);
-              current_freq = cpufreq_get_freq_kernel(current_core);
-	      print_status(&record, wait_for, current_freq, '+', current_core);
+                 if(current_counter==0){
+                              u_next=1;
+                       
+                            }
              }
 
-          else {
-            
-            current_core++;
-            current_counter = get_init_frequency(available_freqs, current_core);
+       else if (go_next == 1 && current_core < CORES){
+              u_next=0;
+              go_next=0;
              
-            if(current_counter >0){
-            cpufreq_set_frequency(current_core, available_freqs[current_counter]);
-            }
+              current_core++;
+ 
+             current_counter = get_init_frequency(available_freqs, current_core);
+            
+                         if(current_counter > 0){
+                               current_counter--;  
+                               cpufreq_set_frequency(current_core, available_freqs[current_counter]);
+                             }
+
+             current_freq = cpufreq_get_freq_kernel(current_core);
+             print_status(&record, wait_for, current_freq, 'N', current_core);
+         
+         }
+         
+
+        else{
             current_freq = cpufreq_get_freq_kernel(current_core);
-            print_status(&record, wait_for, current_freq, 'N', current_core);
-
-         }
-         }
-
-     else{
-          current_freq = cpufreq_get_freq_kernel(current_core);
-          print_status(&record, wait_for, current_freq, 'M', current_core);
+          
+            print_status(&record, wait_for, current_freq, 'M', current_core);
        }
+
       }
+
 
      /*Situation where frequency is downscaled*/
 
       else if(record.window_rate > hrm_get_max_rate(&heart)) {
 	wait_for = current_beat + window_size; 
+         
+          /*   if(next==1){
+               check_next=1;
+                }*/
 
-        if (current_core > 0)  {
 
-           current_counter = get_init_frequency(available_freqs, current_core);   
- 
-          if (current_counter < current){
-              current_counter++;
+            if (current_counter < max_freq -1){
 
-             
-              cpufreq_set_frequency(current_core, available_freqs[current_counter]);
-              current_freq = cpufreq_get_freq_kernel(current_core);
-	      print_status(&record, wait_for, current_freq, '-', current_core);
-          }
+                      current_counter++;
+                      cpufreq_set_frequency(current_core, available_freqs[current_counter]);
+                      current_freq = cpufreq_get_freq_kernel(current_core);
+	              print_status(&record, wait_for, current_freq, '-', current_core);
+
+                      if(current_core > 0){
+                    
+                         i_next==0;
+                        }
+                   /*    else if(current_core ==0 && i_next==1){
+                        next=1;
+                         }*/
+                   }
 	
 
-         else {
-              current_core--;
-          
+           else if ( current_counter > max_freq && current_core > 0)  {
+
+             current_core--;
+
              current_counter = get_init_frequency(available_freqs, current_core);
              
-             if(current_counter < current) {
-             cpufreq_set_frequency(current_core, available_freqs[current_counter]);
-             }
+                 if(current_counter < max_freq -1) {
+                           current_counter++;
+                           cpufreq_set_frequency(current_core, available_freqs[current_counter]);
+                        }
           
             current_freq = cpufreq_get_freq_kernel(current_core);
             print_status(&record, wait_for, current_freq, 'n', current_core);
 
-          }
-	}
-  
+            }
 
- else{
-         current_freq = cpufreq_get_freq_kernel(current_core);
-          print_status(&record, wait_for, current_freq, 'M', current_core);
-       }
+          
+     /*   else if ( current_counter >= max_freq && i_next == 1) {
+
+               current_core++;
+               current_counter = get_init_frequency(available_freqs, current_core);
+
+              if(current_counter < max_freq) {
+                           current_counter++;
+                           cpufreq_set_frequency(current_core, available_freqs[current_counter]);
+                        }
+
+               current_freq = cpufreq_get_freq_kernel(current_core);
+               print_status(&record, wait_for, current_freq, 'n', current_core);
+
+             if (current_core == CORES){
+                      i_next=0;
+                     }
+
+            }*/
+
+
+          else{
+             
+             current_freq = cpufreq_get_freq_kernel(current_core);
+             print_status(&record, wait_for, current_freq, 'm', current_core);
+             }
+
       }
+
 
       else {
 	wait_for = current_beat+1;
-	print_status(&record, wait_for, current_freq, '=', CORES);
+	print_status(&record, wait_for, current_freq, '=', current_core);
       }
+
       current_beat_prev= current_beat;
       records[i].tag = current_beat;
       records[i].rate = record.window_rate;
@@ -491,8 +560,7 @@ printf("beat\trate\tfreq\tcores\ttact\twait\n");
 
   }
 
-  //printf("System: Global heart rate: %f, Current heart rate: %f\n", heart.global_heartrate, heart.window_heartrate);
-
+ 
 /*  for(i = 0; i < MAX; i++) {
     printf("%d, %f\n", records[i].tag, records[i].rate);
   }*/
