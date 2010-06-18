@@ -82,10 +82,6 @@ else
 	echo Sending output to $LOGNAME
 	if [ ! -z $DEBUG ]; then
 		gdb --args $PROGRAM 240 $AFFINITY
-
-	echo Sending output to $LOGNAME
-	if [ ! -z $DEBUG ]; then
-		gdb --args $PROGRAM 240 $AFFINITY
 	else
 		$PROGRAM 240 $AFFINITY| tee $LOGNAME
 	fi

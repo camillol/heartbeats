@@ -286,6 +286,10 @@ int main(int argc, char** argv) {
 
    ncpus=get_cpus();
 
+if(!CORES){
+           CORES == ncpus;
+           }
+
 
 if (CORES > ncpus){
  printf("Wrong number of inital cores");
