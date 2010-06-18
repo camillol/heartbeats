@@ -37,6 +37,9 @@ case $PROG in
 	co|combo|combined)
 		PROGRAM=../bin/combined
 		PROGSYM=co;;
+	none)
+		PROGRAM=none
+		PROGSYM=none;;
 esac
 
 if [ -z $PROGRAM ]; then
@@ -54,10 +57,14 @@ if [ ! -z $AFFINITY ]; then
 	taskset -pc $AFFINITY $(ls ../HB)
 fi
 
-LOGNAME=${PROGSYM}_hr${X264_MIN_HEART_RATE}-${X264_MAX_HEART_RATE}_t${THREAD_COUNT}_a${AFFINITY}_f${FREQ}.txt
-echo Sending output to $LOGNAME
-if [ ! -z $DEBUG ]; then
-	gdb --args $PROGRAM 240 $AFFINITY
+if [ $PROGRAM = none ]; then
+	echo run the program separately
 else
-	$PROGRAM 240 $AFFINITY| tee $LOGNAME
+	LOGNAME=${PROGSYM}_hr${X264_MIN_HEART_RATE}-${X264_MAX_HEART_RATE}_t${THREAD_COUNT}_a${AFFINITY}_f${FREQ}.txt
+	echo Sending output to $LOGNAME
+	if [ ! -z $DEBUG ]; then
+		gdb --args $PROGRAM 240 $AFFINITY
+	else
+		$PROGRAM 240 $AFFINITY| tee $LOGNAME
+	fi
 fi

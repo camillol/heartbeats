@@ -11,7 +11,7 @@
 #define CORE_IDX(core) ((core) + 2)
 #define STATE_LEN(core_count) (CORE_IDX(core_count))
 #define STATE_SIZE(core_count) (sizeof(unsigned long) * STATE_LEN(core_count))
-#define STATE_I(states, i) ((states) + STATE_SIZE(core_count) * (i))
+#define STATE_I(states, core_count, i) ((states) + STATE_LEN(core_count) * (i))
 
 void calculate_state_properties(unsigned long *state, int core_count);
 unsigned long *create_machine_states(int *state_count, int core_count, int freq_count, unsigned long *freq_array);

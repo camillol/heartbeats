@@ -56,6 +56,7 @@ typedef struct machine_state_data {
 	int state_count;
 	actuator_t *core_act;
 	actuator_t *freq_acts[16];
+	unsigned long *scratch_state;
 } machine_state_data_t;
 
 /* a global is fine too */
@@ -270,15 +271,26 @@ int global_freq_act (actuator_t *act)
 
 /* machine speed actuator */
 
+unsigned long get_current_speed(actuator_t *act)
+{
+	machine_state_data_t *data = act->data;
+	unsigned long *current_state = data->scratch_state;
+	int i, core_count = get_core_count();
+
+	for (i = 0; i < core_count; i++)
+		current_state[CORE_IDX(i)] = i < data->core_act->value ? data->freq_acts[i]->value : 0;
+	calculate_state_properties(current_state, core_count);
+	return current_state[SPEED_IDX];
+}
+
 int machine_speed_init (actuator_t *act)
 {
 	machine_state_data_t *data;
-	unsigned long *states;
+	unsigned long *states, *all_states;
 	unsigned long *in_state, *out_state;
 	int state_count, filtered_count;
 	
 	int core_count, i;
-	unsigned long *current_state;
 	freq_scaler_data_t *freq_data;
 
 	act->data = data = malloc(sizeof(machine_state_data_t));
@@ -289,33 +301,38 @@ int machine_speed_init (actuator_t *act)
 	freq_data = data->freq_acts[0]->data;
 	core_count = get_core_count();
 	
-	states = create_machine_states(&state_count, core_count, freq_data->freq_count, freq_data->freq_array);
-	fail_if(!states, "cannot generate machine states");
-	
-	qsort(states, state_count, STATE_SIZE(core_count), compare_states_on_speed);
-	for (i = 0, in_state = out_state = states, filtered_count = 0; i < state_count; i++, in_state+=STATE_LEN(core_count)) {
+	all_states = create_machine_states(&state_count, core_count, freq_data->freq_count, freq_data->freq_array);
+	fail_if(!all_states, "cannot generate machine states");
+
+	qsort(all_states, state_count, STATE_SIZE(core_count), compare_states_on_speed);
+	states = malloc(STATE_SIZE(core_count) * state_count);
+	for (i = 0, in_state = all_states, out_state = states, filtered_count = 0; i < state_count; i++, in_state+=STATE_LEN(core_count)) {
 		if (!redundant_state(in_state, core_count) &&
-			!drop_equivalent(in_state, i, states, state_count, core_count) &&
-			pareto_optimal(in_state, i, states, state_count, core_count) &&
+			!drop_equivalent(in_state, i, all_states, state_count, core_count) &&
+			pareto_optimal(in_state, i, all_states, state_count, core_count) &&
 			in_state[SPEED_IDX] > 0)
 		{
-			memmove (out_state, in_state, STATE_LEN(core_count));
+#if 1
+			int j;
+			printf("%lu\t%lu", in_state[SPEED_IDX], in_state[POWER_IDX]);
+			for (j = 0; j < core_count; j++)
+				printf("\t%lu", in_state[CORE_IDX(j)]);
+			printf("\n");
+#endif
+			memmove (out_state, in_state, STATE_SIZE(core_count));
 			out_state += STATE_LEN(core_count);
 			filtered_count++;
 		}
 	}
 	data->state_count = state_count = filtered_count;
 	data->states = states = realloc(states, STATE_SIZE(core_count) * state_count);
+	free(all_states);
 	
-	act->min = STATE_I(states, 0)[SPEED_IDX];
-	act->max = STATE_I(states, state_count-1)[SPEED_IDX];
+	act->min = STATE_I(states, core_count, 0)[SPEED_IDX];
+	act->max = STATE_I(states, core_count, state_count-1)[SPEED_IDX];
 	
-	current_state = malloc(STATE_SIZE(core_count));
-	for (i = 0; i < core_count; i++)
-		current_state[CORE_IDX(i)] = i < data->core_act->value ? data->freq_acts[i]->value : 0;
-	calculate_state_properties(current_state, core_count);
-	act->value = current_state[SPEED_IDX];
-	free(current_state);
+	data->scratch_state = malloc(STATE_SIZE(core_count));
+	act->value = get_current_speed(act);
 	
 	return 0;
 fail:
@@ -336,7 +353,7 @@ int machine_speed_act (actuator_t *act)
 	/* binary search FTW */
 	do {
 		i = (t+f)/2;
-		state = STATE_I(states, i);
+		state = STATE_I(states, core_count, i);
 		if (state[SPEED_IDX] == act->set_value) break;
 		else if (state[SPEED_IDX] < act->set_value) f = i + 1;
 		else if (state[SPEED_IDX] > act->set_value) t = i - 1;
@@ -345,9 +362,9 @@ int machine_speed_act (actuator_t *act)
 	/* if it's not an exact match, maybe there's a closer one on the other side */
 	d = state[SPEED_IDX] - act->set_value;
 	if (d > 0) {
-		if (i > 0) state2 = states + STATE_SIZE(core_count) * (i - 1);
+		if (i > 0) state2 = STATE_I(states, core_count, i-1);
 	} else if (d < 0) {
-		if (i < data->state_count - 1) state2 = states + STATE_SIZE(core_count) * (i + 1);
+		if (i < data->state_count - 1) state2 = STATE_I(states, core_count, i+1);
 	}
 	if (state2 && abs(state2[SPEED_IDX] - act->set_value) < abs(d)) state = state2;
 	
@@ -355,6 +372,10 @@ int machine_speed_act (actuator_t *act)
 	for (i = 0; i < core_count && state[CORE_IDX(i)] > 0; i++)
 		data->freq_acts[i]->set_value = state[CORE_IDX(i)];
 	data->core_act->set_value = i;
+	if (i < 1) {
+		printf("NNNNOOOOOOOOOO\n");
+	}
+	act->value = get_current_speed(act);
 	return 0;
 }
 
@@ -468,8 +489,8 @@ void core_controller (heartbeat_record_t *current, int act_count, actuator_t *ac
 	
 	if (!core_act) get_actuators(&core_act, NULL, 0, NULL, NULL);
 	core_act->set_value = core_act->value + Kp*error;
-	if (core_act->set_value < core_act>min) core_act->set_value = core_act>min;
-	else if (core_act->set_value > core_act>max) core_act->set_value = core_act>max;
+	if (core_act->set_value < core_act->min) core_act->set_value = core_act->min;
+	else if (core_act->set_value > core_act->max) core_act->set_value = core_act->max;
 }
 
 void machine_state_controller (heartbeat_record_t *current, int act_count, actuator_t *acts)
@@ -482,8 +503,8 @@ void machine_state_controller (heartbeat_record_t *current, int act_count, actua
 	
 	if (!speed_act) get_actuators(NULL, NULL, 0, NULL, &speed_act);
 	speed_act->set_value = speed_act->value + Kp*error;
-	if (speed_act->set_value < speed_act_>min) speed_act->set_value = speed_act_>min;
-	else if (speed_act->set_value > speed_act_>max) speed_act->set_value = speed_act_>max;
+	if (speed_act->set_value < speed_act->min) speed_act->set_value = speed_act->min;
+	else if (speed_act->set_value > speed_act->max) speed_act->set_value = speed_act->max;
 }
 
 /* BACK TO ZA CHOPPA */
@@ -552,7 +573,7 @@ int main(int argc, char **argv)
 	/* initialize machine speed actuator last! */
 	err = controls[0].init_f(&controls[0]);
 	fail_if(err, "cannot initialize actuator");
-	decision_f = uncoordinated_heuristics;
+	decision_f = machine_state_controller;
 	
 	/* begin monitoration of lone protoss */
 	err = heart_rate_monitor_init(&hrm, apps[0]);
