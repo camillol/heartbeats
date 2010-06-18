@@ -36,10 +36,10 @@ struct actuator {
 	int core;
 	int (*init_f) (actuator_t *act);
 	int (*action_f) (actuator_t *act);
-	uint64_t value;
-	uint64_t set_value;
-	uint64_t min;
-	uint64_t max;
+	int64_t value;
+	int64_t set_value;
+	int64_t min;
+	int64_t max;
 	void *data;
 };
 
@@ -280,6 +280,13 @@ unsigned long get_current_speed(actuator_t *act)
 	for (i = 0; i < core_count; i++)
 		current_state[CORE_IDX(i)] = i < data->core_act->value ? data->freq_acts[i]->value : 0;
 	calculate_state_properties(current_state, core_count);
+#if 1
+			int j;
+			printf("%lu\t%lu", current_state[SPEED_IDX], current_state[POWER_IDX]);
+			for (j = 0; j < core_count; j++)
+				printf("\t%lu", current_state[CORE_IDX(j)]);
+			printf("\n");
+#endif
 	return current_state[SPEED_IDX];
 }
 
@@ -332,7 +339,7 @@ int machine_speed_init (actuator_t *act)
 	act->max = STATE_I(states, core_count, state_count-1)[SPEED_IDX];
 	
 	data->scratch_state = malloc(STATE_SIZE(core_count));
-	act->value = get_current_speed(act);
+	act->value = act->set_value = get_current_speed(act);
 	
 	return 0;
 fail:
@@ -375,7 +382,6 @@ int machine_speed_act (actuator_t *act)
 	if (i < 1) {
 		printf("NNNNOOOOOOOOOO\n");
 	}
-	act->value = get_current_speed(act);
 	return 0;
 }
 
@@ -503,8 +509,10 @@ void machine_state_controller (heartbeat_record_t *current, int act_count, actua
 	
 	if (!speed_act) get_actuators(NULL, NULL, 0, NULL, &speed_act);
 	speed_act->set_value = speed_act->value + Kp*error;
+	printf("target: %f hr: %f error: %f speed: %d -> %d ", target_rate, current->window_rate, error, speed_act->value, speed_act->set_value);
 	if (speed_act->set_value < speed_act->min) speed_act->set_value = speed_act->min;
 	else if (speed_act->set_value > speed_act->max) speed_act->set_value = speed_act->max;
+	printf("clipped: %d\n", speed_act->set_value);
 }
 
 /* BACK TO ZA CHOPPA */
@@ -602,11 +610,15 @@ int main(int argc, char **argv)
 		for (i = 0; i < actuator_count; i++) {
 			actuator_t *act = &controls[i];
 			if (act->set_value != act->value) {
+				printf("act %d: %d -> %d\n", i, act->value, act->set_value);
 				err = act->action_f(act);	/* TODO: handle error */
 				if (err) fprintf(stderr, "action %d failed: %s\n", act->id, strerror(errno));
 				acted = 1;
 			}
 		}
+		/* this is horrible but necessary */
+		controls[0].value = get_current_speed(&controls[0]);
+
 		skip_until_beat = current.beat + (acted ? window_size : 1);
 		
 		print_status(&current, skip_until_beat, acted ? '*' : '=', actuator_count, controls);
