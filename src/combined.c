@@ -13,6 +13,7 @@
 #include <unistd.h>
 #include <dirent.h>
 #include <cpufreq.h>
+#include <limits.h>
 #include "heart_rate_monitor.h"
 
 #include "machine_states.h"
@@ -482,6 +483,12 @@ void step_heuristics (heartbeat_record_t *current, int act_count, actuator_t *ac
  P controller:
 	e = sp - y
 	u = [uo +] Kp*e
+ 
+ PI controller:
+	u = [uo +] Kp*e + Ki*sum(e)
+ 
+ pseudo PI controller:
+	u = [u0 +] ... TODO
  */
 
 
@@ -538,16 +545,41 @@ int main(int argc, char **argv)
 	int64_t last_beat = 0;
 	heartbeat_record_t current;
 	int core_count;
+	int opt;
+	int max_beats = INT_MAX;
 	
 	extern int actuator_count;
 	extern actuator_t *controls;
 	actuator_t *next_ctl;
 	
-	decision_function_t decision_f;
+	decision_function_t decision_f = machine_state_controller;
 	int acted;
 
 	/* we want to see this in realtime even when it's piped through tee */
 	setlinebuf(stdout);
+	
+	/* getting rich with stock options */	
+	while ((opt = getopt(argc, argv, "d:")) != -1) switch (opt) {
+		case 'd':
+			if (strcmp(optarg, "core_heuristics") == 0) decision_f = core_heuristics;
+			else if (strcmp(optarg, "freq_heuristics") == 0) decision_f = freq_heuristics;
+			else if (strcmp(optarg, "uncoordinated_heuristics") == 0) decision_f = uncoordinated_heuristics;
+			else if (strcmp(optarg, "step_heuristics") == 0) decision_f = step_heuristics;
+			else if (strcmp(optarg, "core_controller") == 0) decision_f = core_controller;
+			else if (strcmp(optarg, "machine_state_controller") == 0) decision_f = machine_state_controller;
+			else {
+				fprintf(stderr, "%s: unknown decision function\n", argv[0]);
+				exit(1);
+			}
+			break;
+		default:
+			fprintf(stderr, "Usage: %s [-d decision_function]\n", argv[0]);
+			exit(1);
+	}	
+	argc -= optind;
+	argv += optind;	
+	if (argc > 1)
+		max_beats = argv[1];
 	
 	/* setupping arbit */
 	heartbeat_dir = getenv("HEARTBEAT_ENABLED_DIR");
@@ -581,7 +613,6 @@ int main(int argc, char **argv)
 	/* initialize machine speed actuator last! */
 	err = controls[0].init_f(&controls[0]);
 	fail_if(err, "cannot initialize actuator");
-	decision_f = machine_state_controller;
 	
 	/* begin monitoration of lone protoss */
 	err = heart_rate_monitor_init(&hrm, apps[0]);
@@ -590,7 +621,7 @@ int main(int argc, char **argv)
 	window_size = hrm_get_window_size(&hrm);
 	current.beat = -1;
 	
-	while (1) {	/* what, me worry? */
+	do {
 		do {
 			err = hrm_get_current(&hrm, &current);
 		} while (err || current.beat <= last_beat || current.window_rate == 0.0);
@@ -622,7 +653,7 @@ int main(int argc, char **argv)
 		skip_until_beat = current.beat + (acted ? window_size : 1);
 		
 		print_status(&current, skip_until_beat, acted ? '*' : '=', actuator_count, controls);
-	}
+	} while (current.beat < max_beats);
 	
 	heart_rate_monitor_finish(&hrm);
 	
