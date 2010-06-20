@@ -46,7 +46,7 @@ struct actuator {
 	void *data;
 };
 
-typedef void (*decision_function_t) (heartbeat_record_t *hb, int act_count, actuator_t *acts);
+typedef void (*decision_function_t) (heartbeat_record_t *hb, int act_count, actuator_t *acts, double param1, double param2);
 
 typedef struct freq_scaler_data {
 	unsigned long *freq_array;
@@ -392,12 +392,12 @@ int machine_speed_act (actuator_t *act)
 
 /* decision functions */
 
-void dummy_control (heartbeat_record_t *hb, int act_count, actuator_t *acts)
+void dummy_control (heartbeat_record_t *hb, int act_count, actuator_t *acts, double param1, double param2)
 {
 	/* do nothing, lol */
 }
 
-void core_heuristics (heartbeat_record_t *current, int act_count, actuator_t *acts)
+void core_heuristics (heartbeat_record_t *current, int act_count, actuator_t *acts, double param1, double param2)
 {
 	static actuator_t *core_act = NULL;
 
@@ -411,7 +411,7 @@ void core_heuristics (heartbeat_record_t *current, int act_count, actuator_t *ac
 	}
 }
 
-void freq_heuristics (heartbeat_record_t *current, int act_count, actuator_t *acts)
+void freq_heuristics (heartbeat_record_t *current, int act_count, actuator_t *acts, double param1, double param2)
 {
 	static actuator_t *freq_act = NULL;
 	freq_scaler_data_t *freq_data;
@@ -433,13 +433,13 @@ void freq_heuristics (heartbeat_record_t *current, int act_count, actuator_t *ac
 	}
 }
 
-void uncoordinated_heuristics (heartbeat_record_t *current, int act_count, actuator_t *acts)
+void uncoordinated_heuristics (heartbeat_record_t *current, int act_count, actuator_t *acts, double param1, double param2)
 {
-	core_heuristics(current, act_count, acts);
-	freq_heuristics(current, act_count, acts);
+	core_heuristics(current, act_count, acts, param1, param2);
+	freq_heuristics(current, act_count, acts, param1, param2);
 }
 
-void step_heuristics (heartbeat_record_t *current, int act_count, actuator_t *acts)
+void step_heuristics (heartbeat_record_t *current, int act_count, actuator_t *acts, double param1, double param2)
 {
 	static actuator_t *core_act = NULL;
 	static actuator_t *freq_acts[16];
@@ -496,13 +496,13 @@ void step_heuristics (heartbeat_record_t *current, int act_count, actuator_t *ac
  */
 
 
-void core_controller (heartbeat_record_t *current, int act_count, actuator_t *acts)
+void core_p_controller (heartbeat_record_t *current, int act_count, actuator_t *acts, double Kp, double param2)
 {
 	static actuator_t *core_act = NULL;
 	
 	double target_rate = (hrm_get_max_rate(&hrm) + hrm_get_min_rate(&hrm)) / 2.0;
 	double error = target_rate - current->window_rate;
-	double Kp = 0.4;
+//	double Kp = 0.4;
 	
 	if (!core_act) get_actuators(&core_act, NULL, 0, NULL, NULL);
 	core_act->set_value = core_act->value + Kp*error;
@@ -510,13 +510,13 @@ void core_controller (heartbeat_record_t *current, int act_count, actuator_t *ac
 	else if (core_act->set_value > core_act->max) core_act->set_value = core_act->max;
 }
 
-void machine_state_controller (heartbeat_record_t *current, int act_count, actuator_t *acts)
+void machine_state_p_controller (heartbeat_record_t *current, int act_count, actuator_t *acts, double Kp, double param2)
 {
 	static actuator_t *speed_act = NULL;
 	
 	double target_rate = (hrm_get_max_rate(&hrm) + hrm_get_min_rate(&hrm)) / 2.0;
 	double error = target_rate - current->window_rate;
-	double Kp = 100;
+//	double Kp = 100;
 	
 	if (!speed_act) get_actuators(NULL, NULL, 0, NULL, &speed_act);
 	speed_act->set_value = speed_act->value + Kp*error;
@@ -530,38 +530,18 @@ void machine_state_controller (heartbeat_record_t *current, int act_count, actua
 #endif
 }
 
-void machine_state_p50_controller (heartbeat_record_t *current, int act_count, actuator_t *acts)
+void machine_state_pseudo_pi_controller (heartbeat_record_t *current, int act_count, actuator_t *acts, double Kp, double Ki)
 {
 	static actuator_t *speed_act = NULL;
 	
 	double target_rate = (hrm_get_max_rate(&hrm) + hrm_get_min_rate(&hrm)) / 2.0;
 	double error = target_rate - current->window_rate;
-	double Kp = 50;
-	
-	if (!speed_act) get_actuators(NULL, NULL, 0, NULL, &speed_act);
-	speed_act->set_value = speed_act->value + Kp*error;
-#if DEBUG
-	printf("target: %f hr: %f error: %f speed: %d -> %d ", target_rate, current->window_rate, error, speed_act->value, speed_act->set_value);
-#endif
-	if (speed_act->set_value < speed_act->min) speed_act->set_value = speed_act->min;
-	else if (speed_act->set_value > speed_act->max) speed_act->set_value = speed_act->max;
-#if DEBUG
-	printf("clipped: %d\n", speed_act->set_value);
-#endif
-}
-
-void machine_state_pseudo_pi_controller (heartbeat_record_t *current, int act_count, actuator_t *acts)
-{
-	static actuator_t *speed_act = NULL;
-	
-	double target_rate = (hrm_get_max_rate(&hrm) + hrm_get_min_rate(&hrm)) / 2.0;
-	double error = target_rate - current->window_rate;
-	double Kp = 100;
-	double Ki = 25;
+//	double Kp = 100;
+//	double Ki = 25;
 	static double old_error = 0;
 	
 	if (!speed_act) get_actuators(NULL, NULL, 0, NULL, &speed_act);
-	speed_act->set_value = speed_act->value + Kp*error - Ki*old_error;
+	speed_act->set_value = speed_act->value + Kp*error + Ki*old_error;
 #if DEBUG
 	printf("target: %f hr: %f error: %f speed: %d -> %d ", target_rate, current->window_rate, error, speed_act->value, speed_act->set_value);
 #endif
@@ -573,12 +553,12 @@ void machine_state_pseudo_pi_controller (heartbeat_record_t *current, int act_co
 	old_error = error;
 }
 
-void machine_state_histeresis_p_controller (heartbeat_record_t *current, int act_count, actuator_t *acts)
+void machine_state_histeresis_p_controller (heartbeat_record_t *current, int act_count, actuator_t *acts, double Kp, double param2)
 {
 	static actuator_t *speed_act = NULL;
 	
 	double error;
-	double Kp = 100;
+//	double Kp = 100;
 	
 	if (!speed_act) get_actuators(NULL, NULL, 0, NULL, &speed_act);
 	if (current->window_rate < hrm_get_min_rate(&hrm)) error = hrm_get_min_rate(&hrm) - current->window_rate;
@@ -595,20 +575,20 @@ void machine_state_histeresis_p_controller (heartbeat_record_t *current, int act
 #endif
 }
 
-void machine_state_histeresis_pseudo_pi_controller (heartbeat_record_t *current, int act_count, actuator_t *acts)
+void machine_state_histeresis_pseudo_pi_controller (heartbeat_record_t *current, int act_count, actuator_t *acts, double Kp, double Ki)
 {
 	static actuator_t *speed_act = NULL;
 	
 	double error;
-	double Kp = 100;
-	double Ki = 25;
+//	double Kp = 100;
+//	double Ki = 25;
 	static double old_error = 0;
 	
 	if (!speed_act) get_actuators(NULL, NULL, 0, NULL, &speed_act);
 	if (current->window_rate < hrm_get_min_rate(&hrm)) error = hrm_get_min_rate(&hrm) - current->window_rate;
 	else if (current->window_rate > hrm_get_max_rate(&hrm)) error = hrm_get_max_rate(&hrm) - current->window_rate;
 	else error = 0.0;
-	speed_act->set_value = speed_act->value + Kp*error - Ki*old_error;
+	speed_act->set_value = speed_act->value + Kp*error + Ki*old_error;
 #if DEBUG
 	printf("target: %f hr: %f error: %f speed: %d -> %d ", target_rate, current->window_rate, error, speed_act->value, speed_act->set_value);
 #endif
@@ -650,27 +630,39 @@ int main(int argc, char **argv)
 	extern actuator_t *controls;
 	actuator_t *next_ctl;
 	
-	decision_function_t decision_f = machine_state_controller;
+	decision_function_t decision_f = NULL;
+	double param1 = 0.0, param2 = 0.0;
 	int acted;
 
 	/* we want to see this in realtime even when it's piped through tee */
 	setlinebuf(stdout);
 	
 	/* getting rich with stock options */	
-	while ((opt = getopt(argc, argv, "d:")) != -1) switch (opt) {
+	while ((opt = getopt(argc, argv, "d:p:q:")) != -1) switch (opt) {
 		case 'd':
 			if (strcmp(optarg, "core_heuristics") == 0) decision_f = core_heuristics;
 			else if (strcmp(optarg, "freq_heuristics") == 0) decision_f = freq_heuristics;
 			else if (strcmp(optarg, "uncoordinated_heuristics") == 0) decision_f = uncoordinated_heuristics;
 			else if (strcmp(optarg, "step_heuristics") == 0) decision_f = step_heuristics;
-			else if (strcmp(optarg, "core_controller") == 0) decision_f = core_controller;
-			else if (strcmp(optarg, "machine_state_controller") == 0) decision_f = machine_state_controller;
+			else if (strcmp(optarg, "core_p_controller") == 0) decision_f = core_p_controller;
+			else if (strcmp(optarg, "machine_state_p_controller") == 0) decision_f = machine_state_p_controller;
 			else if (strcmp(optarg, "machine_state_pseudo_pi_controller") == 0) decision_f = machine_state_pseudo_pi_controller;
 			else if (strcmp(optarg, "machine_state_histeresis_p_controller") == 0) decision_f = machine_state_histeresis_p_controller;
 			else if (strcmp(optarg, "machine_state_histeresis_pseudo_pi_controller") == 0) decision_f = machine_state_histeresis_pseudo_pi_controller;
-			else if (strcmp(optarg, "machine_state_p50_controller") == 0) decision_f = machine_state_p50_controller;
 			else {
 				fprintf(stderr, "%s: unknown decision function\n", argv[0]);
+				exit(1);
+			}
+			break;
+		case 'p':
+			if (sscanf(optarg, "%lf", &param1) < 1) {
+				fprintf(stderr, "%s: bad param\n", argv[0]);
+				exit(1);
+			}
+			break;
+		case 'q':
+			if (sscanf(optarg, "%lf", &param2) < 1) {
+				fprintf(stderr, "%s: bad param\n", argv[0]);
 				exit(1);
 			}
 			break;
@@ -740,7 +732,7 @@ int main(int argc, char **argv)
 		/*printf("Current beat: %lld, tag: %d, window: %lld, window_rate: %f\n",
 			   current.beat, current.tag, window_size, current.window_rate);*/
 		
-		decision_f(&current, actuator_count, controls);
+		decision_f(&current, actuator_count, controls, param1, param2);
 		
 		acted = 0;
 		for (i = 0; i < actuator_count; i++) {
