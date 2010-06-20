@@ -724,6 +724,7 @@ int main(int argc, char **argv)
 	
 	window_size = hrm_get_window_size(&hrm);
 	current.beat = -1;
+	skip_until_beat = window_size;
 	
 	do {
 		do {
