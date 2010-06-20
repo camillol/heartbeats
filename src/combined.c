@@ -718,6 +718,26 @@ int main(int argc, char **argv)
 	current.beat = -1;
 	skip_until_beat = window_size;
 	
+	/* header */
+	printf("beat\trate\twait\tact");
+	for (i = 0; i < actuator_count; i++) switch (controls[i].id) {
+		case ACTUATOR_CORE_COUNT:
+			printf("\tcores");
+			break;
+		case ACTUATOR_GLOBAL_FREQ:
+			printf("\tgfreq");
+			break;
+		case ACTUATOR_SINGLE_FREQ:
+			printf("\tfreq%d", controls[i].core);
+			break;
+		case ACTUATOR_MACHINE_SPD:
+			printf("\tspeed");
+			break;
+		default:
+			printf("\t???");
+	}
+	printf("\n");
+
 	do {
 		do {
 			err = hrm_get_current(&hrm, &current);
