@@ -20,7 +20,7 @@ while getopts 'm:M:t:a:f:p:dc:x:' OPT; do
 			DEBUG=1;;
 		c)
 			if [ ! -z $OPTARG ]; then
-				COUNTER=_c$OPTARG
+				COUNTER=_$OPTARG
 			fi;;
 		x)
 			EXTRA_ARG=$OPTARG;;

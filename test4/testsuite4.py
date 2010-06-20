@@ -7,6 +7,7 @@ def fmt_ext_args(s):
 	return prog + " -x " + args.replace(' ','+')
 
 suite1 = {
+	'name': 'sf2',
 	'thread_num': 4,
 	'init_core': 4,
 	'init_freq': 2,
@@ -30,8 +31,10 @@ suite1 = {
 	'hr_min_max_pairs': [(7, 9), (4, 5), (5, 6), (8, 9), (8, 10), (4, 6), (9, 10), (4, 7), (9, 11), (10, 12), (11, 13), (10, 11), (7, 8), (10, 13), (11, 12), (8, 11), (6, 7), (5, 7), (6, 8), (6, 9)]
 }
 suite2 = suite1.copy()
+suite2['name'] = 'sf1'
 suite2['init_freq'] = 1
 suite_ctl = {
+	'name': 'ctl',
 	'thread_num': 4,
 	'init_core': 4,
 	'init_freq': 2,
@@ -56,9 +59,13 @@ suite_ctl = {
 	'repetitions': 3,
 	'hr_min_max_pairs': [(7, 9), (4, 5), (8, 9), (8, 10), (9, 11), (10, 12), (6, 7)]
 }
+suite_ctl_macbook = suite_ctl.copy()
+suite_ctl_macbook['name'] = 'ctlmb'
+suite_ctl_macbook['hr_min_max_pairs'] = [(1,2), (2, 3), (3, 4), (1.5, 3)]
 
 suites = [
-	suite_ctl,
+	suite_ctl_macbook
+#	suite_ctl,
 #	suite1,
 #	suite2
 ]
@@ -73,19 +80,18 @@ suites = [
 #print hr_min_max_pairs
 #exit(1)
 
-counter = 10
 for suite in suites:
+	suitename = suite['name']
 	thread_num = suite['thread_num']
 	init_core = suite['init_core']
 	init_freq = suite['init_freq']
 	programs = suite['programs']
 	repetitions = suite['repetitions']
 	hr_min_max_pairs = suite['hr_min_max_pairs']
-	for i in xrange(repetitions):
-		counter = counter + 1
+	for counter in xrange(1, repetitions+1):
 		for hrmin, hrmax in hr_min_max_pairs:
 			for progname in programs:
-				cmd = "sh test4.sh -m %05.2f -M %05.2f -t %d -a 0-%d -f %d -p %s -c %d" % (hrmin, hrmax, thread_num, init_core-1, init_freq, progname, counter)
+				cmd = "sh test4.sh -m %05.2f -M %05.2f -t %d -a 0-%d -f %d -p %s -c %s-%d" % (hrmin, hrmax, thread_num, init_core-1, init_freq, progname, suitename, counter)
 				print cmd
 				status = system(cmd)
 				if status != 0:
