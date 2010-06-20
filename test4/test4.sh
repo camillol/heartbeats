@@ -48,6 +48,9 @@ case $PROG in
 			EXTRA_ARGS=$(echo $EXTRA_ARG | tr + ' ')
 			PROGSYM=co_$EXTRA_ARG
 		fi;;
+	both)
+		PROGRAM=./both.sh
+		PROGSYM=ca+fs;;
 	none)
 		PROGRAM=none
 		PROGSYM=none;;
