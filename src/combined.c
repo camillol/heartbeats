@@ -455,8 +455,14 @@ void step_heuristics (heartbeat_record_t *current, int act_count, actuator_t *ac
 	freq_data = freq_acts[last_core]->data;
 	
 	if (current->window_rate < hrm_get_min_rate(&hrm)) {
+#if DEBUG
+		printf("rate too low; last_core=%d; f_idx=%d\n", last_core, freq_data->cur_index);
+#endif
 		if (freq_data->cur_index > 0) {
 			/* increase last core's frequency if possible */
+#if DEBUG
+			printf("%d -> %d\n", freq_data->freq_array[freq_data->cur_index], freq_data->freq_array[freq_data->cur_index - 1]);
+#endif
 			freq_data->cur_index--;
 			freq_acts[last_core]->set_value = freq_data->freq_array[freq_data->cur_index];
 		} else if (last_core < core_act->max - 1) {
@@ -467,18 +473,33 @@ void step_heuristics (heartbeat_record_t *current, int act_count, actuator_t *ac
 			freq_data = freq_acts[last_core]->data;
 			freq_data->cur_index = freq_data->freq_count-1;
 			freq_acts[last_core]->set_value = freq_data->freq_array[freq_data->cur_index];
+#if DEBUG
+			printf("add core, idx:%d\n", freq_data->cur_index);
+#endif
 		}
 	}
 	else if(current->window_rate > hrm_get_max_rate(&hrm)) {
+#if DEBUG
+		printf("rate too high; last_core=%d; f_idx=%d\n", last_core, freq_data->cur_index);
+#endif
 		if (freq_data->cur_index < freq_data->freq_count-1) {
 			/* decrease last core's frequency if possible */
+#if DEBUG
+			printf("%d -> %d\n", freq_data->freq_array[freq_data->cur_index], freq_data->freq_array[freq_data->cur_index + 1]);
+#endif
 			freq_data->cur_index++;
 			freq_acts[last_core]->set_value = freq_data->freq_array[freq_data->cur_index];
+#if DEBUG
+			printf("act %d set to %lld\n", last_core, freq_acts[last_core]->set_value);
+#endif
 		} else if (last_core > core_act->min - 1) {
 			/* else, reduce core count */
 			core_act->set_value = core_act->value - 1;
 			last_core--;
 			/* the core that is now last should already be at max frequency */
+#if DEBUG
+			printf("remove core\n");
+#endif
 		}
 	}
 }
@@ -565,14 +586,8 @@ void machine_state_histeresis_p_controller (heartbeat_record_t *current, int act
 	else if (current->window_rate > hrm_get_max_rate(&hrm)) error = hrm_get_max_rate(&hrm) - current->window_rate;
 	else error = 0.0;
 	speed_act->set_value = speed_act->value + Kp*error;
-#if DEBUG
-	printf("target: %f hr: %f error: %f speed: %d -> %d ", target_rate, current->window_rate, error, speed_act->value, speed_act->set_value);
-#endif
 	if (speed_act->set_value < speed_act->min) speed_act->set_value = speed_act->min;
 	else if (speed_act->set_value > speed_act->max) speed_act->set_value = speed_act->max;
-#if DEBUG
-	printf("clipped: %d\n", speed_act->set_value);
-#endif
 }
 
 void machine_state_histeresis_pseudo_pi_controller (heartbeat_record_t *current, int act_count, actuator_t *acts, double Kp, double Ki)
@@ -589,14 +604,8 @@ void machine_state_histeresis_pseudo_pi_controller (heartbeat_record_t *current,
 	else if (current->window_rate > hrm_get_max_rate(&hrm)) error = hrm_get_max_rate(&hrm) - current->window_rate;
 	else error = 0.0;
 	speed_act->set_value = speed_act->value + Kp*error + Ki*old_error;
-#if DEBUG
-	printf("target: %f hr: %f error: %f speed: %d -> %d ", target_rate, current->window_rate, error, speed_act->value, speed_act->set_value);
-#endif
 	if (speed_act->set_value < speed_act->min) speed_act->set_value = speed_act->min;
 	else if (speed_act->set_value > speed_act->max) speed_act->set_value = speed_act->max;
-#if DEBUG
-	printf("clipped: %d\n", speed_act->set_value);
-#endif
 	old_error = error;
 }
 
@@ -766,8 +775,9 @@ int main(int argc, char **argv)
 				acted = 1;
 			}
 		}
-		/* this is horrible but necessary */
-		controls[0].value = get_current_speed(&controls[0]);
+		/* this is horrible but necessary due to time constraints: update speed actuator's value */
+		if (controls[0].value != controls[0].set_value)
+			controls[0].value = get_current_speed(&controls[0]);
 
 		skip_until_beat = current.beat + (acted ? window_size : 1);
 		
