@@ -1,0 +1,2 @@
+#!/bin/sh
+./configure --extra-cflags=-I../heartbeats/inc --extra-ldflags=-L../heartbeats/lib/ --extra-ldflags=-lhb-shared --extra-ldflags=-lrt --enable-pthread
