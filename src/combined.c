@@ -649,7 +649,8 @@ int main(int argc, char **argv)
 	/* getting rich with stock options */	
 	while ((opt = getopt(argc, argv, "d:p:q:")) != -1) switch (opt) {
 		case 'd':
-			if (strcmp(optarg, "core_heuristics") == 0) decision_f = core_heuristics;
+			if (strcmp(optarg, "dummy_control") == 0) decision_f = dummy_control;
+			else if (strcmp(optarg, "core_heuristics") == 0) decision_f = core_heuristics;
 			else if (strcmp(optarg, "freq_heuristics") == 0) decision_f = freq_heuristics;
 			else if (strcmp(optarg, "uncoordinated_heuristics") == 0) decision_f = uncoordinated_heuristics;
 			else if (strcmp(optarg, "step_heuristics") == 0) decision_f = step_heuristics;

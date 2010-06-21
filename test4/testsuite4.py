@@ -59,10 +59,11 @@ suite_ctl = {
 	'repetitions': 3,
 	'hr_min_max_pairs': [(7, 9), (4, 5), (8, 9), (8, 10), (9, 11), (10, 12), (6, 7)]
 }
-macbook_pairs = [(1.8,1.85), (1,2), (2, 2.1), (2.9, 3), (1.5, 1.6)]
+macbook_pairs0 = [(1.8,1.85), (1,2), (2, 2.1), (2.9, 3), (1.5, 1.6)]
+macbook_pairs1 = [(2.9, 3), (2,2.1)]
 suite_ctl_macbook = suite_ctl.copy()
 suite_ctl_macbook['name'] = 'ctlmb'
-suite_ctl_macbook['hr_min_max_pairs'] = macbook_pairs
+suite_ctl_macbook['hr_min_max_pairs'] = macbook_pairs1
 suite_compare_bothness_mb = {
 	'name': 'bo2',
 	'thread_num': 4,
@@ -76,11 +77,27 @@ suite_compare_bothness_mb = {
 		"ca",
 	],
 	'repetitions': 3,
-	'hr_min_max_pairs': macbook_pairs
+	'hr_min_max_pairs': macbook_pairs0
+}
+suite_compare_bothness_mb2 = {
+	'name': 'bo2+',
+	'thread_num': 4,
+	'init_core': 4,
+	'init_freq': 2,
+	'programs': [
+		"both",
+		fmt_ext_args("co -d step_heuristics"),
+		fmt_ext_args("co -d uncoordinated_heuristics"),
+		"fs",
+		"ca",
+	],
+	'repetitions': 3,
+	'hr_min_max_pairs': [(2.9, 3), (3.2,3.25)]
 }
 
 suites = [
-	suite_compare_bothness_mb,
+#	suite_compare_bothness_mb2,
+#	suite_compare_bothness_mb,
 	suite_ctl_macbook
 #	suite_ctl,
 #	suite1,
