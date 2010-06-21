@@ -95,10 +95,70 @@ suite_compare_bothness_mb2 = {
 	'hr_min_max_pairs': [(2.9, 3), (3.2,3.25)]
 }
 
+#6-24
+suite_foone1 = {
+	'name': 'foone',
+	'thread_num': 4,
+	'init_core': 4,
+	'init_freq': 3,
+	'programs': [
+		fmt_ext_args("co -d step_heuristics"),
+		fmt_ext_args("co -d uncoordinated_heuristics"),
+		"fs",
+		"fs2",
+		"ca",
+		fmt_ext_args("co -d dummy_control"),
+		fmt_ext_args("co -d core_heuristics"),
+		fmt_ext_args("co -d freq_heuristics"),
+		fmt_ext_args("co -d core_p_controller -p 0.02"),
+		fmt_ext_args("co -d core_p_controller -p 0.2"),
+		fmt_ext_args("co -d machine_state_p_controller -p 2"),
+		fmt_ext_args("co -d machine_state_p_controller -p 5"),
+		fmt_ext_args("co -d machine_state_histeresis_p_controller -p 2"),
+		fmt_ext_args("co -d machine_state_histeresis_p_controller -p 5"),
+		fmt_ext_args("co -d machine_state_pseudo_pi_controller -p 2 -q 0.5"),
+		fmt_ext_args("co -d machine_state_pseudo_pi_controller -p 2 -q -0.5"),
+		fmt_ext_args("co -d machine_state_pseudo_pi_controller -p 5 -q 1"),
+		fmt_ext_args("co -d machine_state_pseudo_pi_controller -p 5 -q -1"),
+	],
+	'repetitions': 3,
+	'hr_min_max_pairs': [(18,19), (19,20), (12,12.5), (11,13), (17,20)]
+}
+suite_foone2 = {
+	'name': 'foone2',
+	'thread_num': 4,
+	'init_core': 1,
+	'init_freq': 2,
+	'programs': [
+		fmt_ext_args("co -d step_heuristics"),
+		fmt_ext_args("co -d uncoordinated_heuristics"),
+		"fs",
+		"fs2",
+		"ca",
+		fmt_ext_args("co -d dummy_control"),
+		fmt_ext_args("co -d core_heuristics"),
+		fmt_ext_args("co -d freq_heuristics"),
+		fmt_ext_args("co -d core_p_controller -p 0.02"),
+		fmt_ext_args("co -d core_p_controller -p 0.2"),
+		fmt_ext_args("co -d machine_state_p_controller -p 2"),
+		fmt_ext_args("co -d machine_state_p_controller -p 5"),
+		fmt_ext_args("co -d machine_state_histeresis_p_controller -p 2"),
+		fmt_ext_args("co -d machine_state_histeresis_p_controller -p 5"),
+		fmt_ext_args("co -d machine_state_pseudo_pi_controller -p 2 -q 0.5"),
+		fmt_ext_args("co -d machine_state_pseudo_pi_controller -p 2 -q -0.5"),
+		fmt_ext_args("co -d machine_state_pseudo_pi_controller -p 5 -q 1"),
+		fmt_ext_args("co -d machine_state_pseudo_pi_controller -p 5 -q -1"),
+	],
+	'repetitions': 3,
+	'hr_min_max_pairs': [(18,19), (19,20), (12,12.5), (11,13), (17,20)]
+}
+
 suites = [
+	suite_foone1,
+	suite_foone2,
 #	suite_compare_bothness_mb2,
 #	suite_compare_bothness_mb,
-	suite_ctl_macbook
+#	suite_ctl_macbook
 #	suite_ctl,
 #	suite1,
 #	suite2
