@@ -4,7 +4,7 @@ X264_MAX_HEART_RATE=10
 THREAD_COUNT=1
 ENCODER_PARAMS="-B 400"
 VIDEOSRC=tractor.mkv
-while getopts 'm:M:t:a:f:p:dc:x:e:' OPT; do
+while getopts 'm:M:t:a:f:p:dc:x:e:v:' OPT; do
 	case $OPT in
 		m)
 			X264_MIN_HEART_RATE=$OPTARG;;

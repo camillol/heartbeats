@@ -153,9 +153,26 @@ suite_foone2 = {
 	'hr_min_max_pairs': [(18,19), (19,20), (12,12.5), (11,13), (17,20)]
 }
 
+suite_compare_bothness_dusk = {
+	'name': 'bo2dusk',
+	'thread_num': 4,
+	'init_core': 4,
+	'init_freq': 2,
+	'programs': [
+		"both",
+		fmt_ext_args("co -d step_heuristics"),
+		fmt_ext_args("co -d uncoordinated_heuristics"),
+		"fs",
+		"ca",
+	],
+	'repetitions': 5,
+	'hr_min_max_pairs': [(7, 9), (4, 5), (8, 9), (8, 10), (9, 11), (10, 12), (6, 7)]
+}
+
 suites = [
-	suite_foone1,
-	suite_foone2,
+	suite_compare_bothness_dusk,
+#	suite_foone1,
+#	suite_foone2,
 #	suite_compare_bothness_mb2,
 #	suite_compare_bothness_mb,
 #	suite_ctl_macbook

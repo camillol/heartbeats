@@ -46,6 +46,8 @@ come confrontare le performance dei servizi
 - % dei beat in cui è nel range
 
 
+NOTA: gettare via i beat prima del 20, diversi servizi valutano erroneamente le condizioni iniziali!!
+
 
 
 
