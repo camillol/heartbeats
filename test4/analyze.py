@@ -20,12 +20,13 @@ class LogEntry(object):
 		self.deltamid = deltamid
 
 class TestEntry(object):
-	__slots__ = ['test_type', 'progname', 'tag', 'avg_hr', 'avg_err', 'avg_sq_err', 'avg_sq_deltamid']
-	def __init__(self, test_type, progname, tag, avg_hr, avg_err, avg_sq_err, avg_sq_deltamid):
+	__slots__ = ['test_type', 'progname', 'tag', 'avg_hr', 'stdv_hr', 'avg_err', 'avg_sq_err', 'avg_sq_deltamid']
+	def __init__(self, test_type, progname, tag, avg_hr, stdv_hr, avg_err, avg_sq_err, avg_sq_deltamid):
 		self.test_type = test_type
 		self.progname = progname
 		self.tag = tag
 		self.avg_hr = avg_hr
+		self.stdv_hr = stdv_hr
 		self.avg_err = avg_err
 		self.avg_sq_err = avg_sq_err
 		self.avg_sq_deltamid = avg_sq_deltamid
@@ -84,6 +85,7 @@ for name in os.listdir(logdir):
 	beat_count = len(log)
 	
 	avg_hr = sum(l.hr for l in log) / beat_count
+	stdv_hr = sum((l.hr-avg_hr)**2 for l in log) / beat_count
 	avg_err = sum(l.err for l in log) / beat_count
 	avg_sq_err = sum(l.err*l.err for l in log) / beat_count
 	avg_sq_deltamid = sum(l.deltamid*l.deltamid for l in log) / beat_count
@@ -93,17 +95,17 @@ for name in os.listdir(logdir):
 			(threads, init_affinity, init_freq, hr_min, hr_max, progname, avg_hr, avg_err, avg_sq_err, avg_sq_deltamid)
 	
 	test_type = (hr_min, hr_max, threads, init_freq, init_affinity)
-	test = TestEntry(test_type, progname, tag, avg_hr, avg_err, avg_sq_err, avg_sq_deltamid)
+	test = TestEntry(test_type, progname, tag, avg_hr, stdv_hr, avg_err, avg_sq_err, avg_sq_deltamid)
 	test_types[test_type].append(test)
 	programs[progname].append(test)
 
 for test_type, test_list in test_types.items():
 	test_list.sort(key=attrgetter('avg_sq_err'))
 	print "hr: %05.2f-%05.2f - %d threads - init: freq %05.2f aff %s" % test_type
-	print "av hr\tav err\tav sqer\tav sqdm\tprogname (run)"
+	print "av hr\tsdv hr\tav err\tav sqer\tav sqdm\tprogname (run)"
 	for test in test_list:
-		print "%05.2f\t%05.3f\t%05.3f\t%05.3f\t%s (%s)" % \
-			(test.avg_hr, test.avg_err, test.avg_sq_err, test.avg_sq_deltamid, test.progname, test.tag)
+		print "%05.2f\t%05.2f\t%05.3f\t%05.3f\t%05.3f\t%s (%s)" % \
+			(test.avg_hr, test.stdv_hr, test.avg_err, test.avg_sq_err, test.avg_sq_deltamid, test.progname, test.tag)
 	print
 
 program_avg_sqe = []
@@ -111,10 +113,10 @@ program_avg_sqe = []
 for progname, test_list in programs.items():
 	test_list.sort(key=attrgetter('avg_sq_err'))
 	print progname
-	print "av hr\tav err\tav sqer\tav sqdm\ttesttype"
+	print "av hr\tsdv hr\tav err\tav sqer\tav sqdm\ttesttype"
 	for test in test_list:
-		print "%05.2f\t%05.3f\t%05.3f\t%05.3f\t" % \
-			(test.avg_hr, test.avg_err, test.avg_sq_err, test.avg_sq_deltamid) + \
+		print "%05.2f\t%05.2f\t%05.3f\t%05.3f\t%05.3f\t" % \
+			(test.avg_hr, test.stdv_hr, test.avg_err, test.avg_sq_err, test.avg_sq_deltamid) + \
 			"%05.2f-%05.2f %d %05.2f %s" % test.test_type
 	avg_sqe = sum(t.avg_sq_err for t in test_list) / len(test_list)
 	program_avg_sqe.append((avg_sqe, progname))
