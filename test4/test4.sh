@@ -2,7 +2,9 @@
 X264_MIN_HEART_RATE=5
 X264_MAX_HEART_RATE=10
 THREAD_COUNT=1
-while getopts 'm:M:t:a:f:p:dc:x:' OPT; do
+ENCODER_PARAMS="-B 400"
+VIDEOSRC=tractor.mkv
+while getopts 'm:M:t:a:f:p:dc:x:e:' OPT; do
 	case $OPT in
 		m)
 			X264_MIN_HEART_RATE=$OPTARG;;
@@ -24,6 +26,10 @@ while getopts 'm:M:t:a:f:p:dc:x:' OPT; do
 			fi;;
 		x)
 			EXTRA_ARG=$OPTARG;;
+		e)
+			ENCODER_PARAMS=$(echo $OPTARG | tr + ' ');;
+		v)
+			VIDEOSRC=$OPTARG;;
 	esac
 	echo $OPT $OPTARG
 done
@@ -69,7 +75,7 @@ fi
 
 mkdir -p "$HEARTBEAT_ENABLED_DIR"
 
-../../x264-heartbeat-shared/x264 -B 400 --threads $THREAD_COUNT -o out.264 pipe4.y4m >/dev/null & mplayer -nolirc tractor.mkv -vo yuv4mpeg:file=pipe4.y4m -nosound > /dev/null &
+../../x264-heartbeat-shared/x264 $ENCODER_PARAMS --threads $THREAD_COUNT -o out.264 pipe4.y4m >/dev/null & mplayer -nolirc $VIDEOSRC -vo yuv4mpeg:file=pipe4.y4m -nosound > /dev/null &
 
 while [ -z $PID ]; do
 	PID=$(ls "$HEARTBEAT_ENABLED_DIR")
