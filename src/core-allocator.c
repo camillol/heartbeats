@@ -132,6 +132,25 @@ FILE *fp;
 	return (ret+1);
 }
 
+int get_current_cores_assigned(pid_t pid)
+{
+	char buf[256];
+	FILE *proc;
+	unsigned int affinity;
+	int result;
+	
+	snprintf(buf, sizeof(buf), "taskset -p %d | sed 's/.* //'", (int)pid);
+	proc = popen(buf, "r");
+	pclose(proc);
+	
+	result = 0;
+	while (affinity) {
+		result += affinity & 0x01;
+		affinity /= 2;
+	}
+	return result;
+}
+
 
 void print_status(heartbeat_record_t *current, int wait_for, int cores, char action)
 {
@@ -144,7 +163,6 @@ void print_status(heartbeat_record_t *current, int wait_for, int cores, char act
   int n = 0;
   int i;
   const int MAX = atoi(argv[1]);
-  const int CORES= atoi(argv[2]);
   int ncpus=0;
   int nprocs = 1;
 
@@ -156,11 +174,6 @@ ncpus=get_cpus();
 
 
 
-
-  if(CORES > ncpus){
-   printf("Wrong number of inital cores");
-   exit(2);
-}
 
    if(getenv("HEARTBEAT_ENABLED_DIR") == NULL) {
      fprintf(stderr, "ERROR: need to define environment variable HEARTBEAT_ENABLED_DIR (see README)\n");
@@ -206,7 +219,7 @@ printf("beat\trate\tcores\tact\twait\n");
 
   // return 1; 
  
-  nprocs=CORES;
+  nprocs=get_current_cores_assigned(apps[0]);
     
   while(current_beat < MAX) {
     int rc = -1;
